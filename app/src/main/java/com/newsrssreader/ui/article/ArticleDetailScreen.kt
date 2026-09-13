@@ -2,6 +2,7 @@ package com.newsrssreader.ui.article
 
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +66,7 @@ import com.newsrssreader.ui.theme.AppTheme
 fun ArticleDetailScreen(
     newsItem: NewsItem,
     onBack: () -> Unit,
+    onImageClick: (String) -> Unit,
     viewModel: ArticleViewModel = viewModel { ArticleViewModel(newsItem) },
     modifier: Modifier = Modifier,
 ) {
@@ -150,7 +152,8 @@ fun ArticleDetailScreen(
                         .fillMaxWidth()
                         .aspectRatio(aspectRatio)
                         .background(AppTheme.colors.gray.copy(alpha = 0.2f))
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 16.dp)
+                        .clickable { onImageClick(newsItem.image) },
                 )
             }
 
@@ -158,7 +161,7 @@ fun ArticleDetailScreen(
                 uiState.isLoading -> ArticleLoadingBody()
                 uiState.error != null -> ArticleErrorBody(message = uiState.error.orEmpty())
                 else -> uiState.content?.content?.forEach { block ->
-                    ArticleContentBlock(block)
+                    ArticleContentBlock(block, onImageClick)
                 }
             }
         }
@@ -166,11 +169,11 @@ fun ArticleDetailScreen(
 }
 
 @Composable
-private fun ArticleContentBlock(block: ArticleContentType) {
+private fun ArticleContentBlock(block: ArticleContentType, onImageClick: (String) -> Unit) {
     when (block) {
         is ArticleContentType.Paragraph -> ParagraphBlock(block)
         is ArticleContentType.Subheading -> SubheadingBlock(block)
-        is ArticleContentType.Image -> ImageBlock(block)
+        is ArticleContentType.Image -> ImageBlock(block, onImageClick)
         is ArticleContentType.Quote -> QuoteBlock(block)
         is ArticleContentType.Author -> AuthorBlock(block)
         is ArticleContentType.InfoBox -> InfoBoxBlock(block)

@@ -1,6 +1,7 @@
 package com.newsrssreader.ui.components.article
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +22,11 @@ import com.newsrssreader.ui.theme.AppTheme
  * usage of that style.
  */
 @Composable
-fun ImageBlock(block: ArticleContentType.Image, modifier: Modifier = Modifier) {
+fun ImageBlock(
+    block: ArticleContentType.Image,
+    onImageClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -32,7 +37,8 @@ fun ImageBlock(block: ArticleContentType.Image, modifier: Modifier = Modifier) {
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AppTheme.colors.gray.copy(alpha = 0.2f)),
+                .background(AppTheme.colors.gray.copy(alpha = 0.2f))
+                .clickable { onImageClick(block.url) },
         )
 
         if (block.caption != null || block.credit != null) {

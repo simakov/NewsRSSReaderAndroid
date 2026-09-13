@@ -1,5 +1,6 @@
 package com.newsrssreader
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -29,6 +30,7 @@ import com.newsrssreader.ui.article.ArticleDetailScreen
 import com.newsrssreader.ui.category.CategoryScreen
 import com.newsrssreader.ui.components.MenuView
 import com.newsrssreader.ui.home.HomeScreen
+import com.newsrssreader.ui.photo.PhotoViewerScreen
 import com.newsrssreader.ui.theme.NewsRSSReaderTheme
 
 class MainActivity : ComponentActivity() {
@@ -109,6 +111,7 @@ fun AppRoot() {
                     ArticleDetailScreen(
                         newsItem = item,
                         onBack = { navController.popBackStack() },
+                        onImageClick = { url -> navController.navigate("photo/${Uri.encode(url)}") },
                     )
                 } else {
                     // Process death (or any other loss of the in-memory cache) can leave us with
@@ -119,6 +122,16 @@ fun AppRoot() {
                     // composable body.
                     LaunchedEffect(id) { navController.popBackStack() }
                 }
+            }
+            composable(
+                route = "photo/{encodedUrl}",
+                arguments = listOf(navArgument("encodedUrl") { type = NavType.StringType }),
+            ) { entry ->
+                val url = Uri.decode(entry.arguments?.getString("encodedUrl").orEmpty())
+                PhotoViewerScreen(
+                    imageUrl = url,
+                    onBack = { navController.popBackStack() },
+                )
             }
         }
 
