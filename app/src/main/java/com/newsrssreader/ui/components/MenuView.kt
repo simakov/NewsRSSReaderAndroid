@@ -6,10 +6,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
@@ -46,7 +49,15 @@ fun MenuView(
                 interactionSource = remember { MutableInteractionSource() },
             ) {},
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            // Same status-bar-inset-then-center treatment as TopPanel: inset below the status
+            // bar, then let CenterVertically (via the IconButton's own padding) center the X
+            // within the remaining height, instead of letting it sit under/against the status bar.
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             IconButton(onClick = onDismiss, modifier = Modifier.padding(start = 20.dp)) {
                 Icon(
                     imageVector = Icons.Default.Close,

@@ -2,8 +2,11 @@ package com.newsrssreader.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
@@ -24,7 +27,11 @@ import com.newsrssreader.ui.theme.AppTheme
 @Composable
 fun TopPanel(onMenuClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = modifier.background(AppTheme.colors.background),
+        // Inset below the status bar first, then let CenterVertically center the icon/text within
+        // whatever height remains (content + padding still determine the bar's total height).
+        modifier = modifier
+            .background(AppTheme.colors.background)
+            .windowInsetsPadding(WindowInsets.statusBars),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onMenuClick, modifier = Modifier.padding(10.dp)) {

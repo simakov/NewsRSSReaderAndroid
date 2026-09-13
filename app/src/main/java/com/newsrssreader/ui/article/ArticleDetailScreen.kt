@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -31,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,16 +69,16 @@ fun ArticleDetailScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = newsItem.title.orEmpty(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
+                // Title is intentionally left empty per user request — it still appears in the
+                // scrollable body below, so showing it again here would be redundant.
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = AppTheme.colors.white,
+                        )
                     }
                 },
                 actions = {
@@ -90,9 +90,14 @@ fun ArticleDetailScreen(
                         }
                         context.startActivity(Intent.createChooser(sendIntent, null))
                     }) {
-                        Icon(Icons.Default.Share, contentDescription = null)
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            tint = AppTheme.colors.white,
+                        )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppTheme.colors.background),
             )
         },
     ) { innerPadding ->

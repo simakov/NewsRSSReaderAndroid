@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
@@ -38,6 +39,17 @@ class MainActivity : ComponentActivity() {
         // is drawn.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Explicitly opt into edge-to-edge rather than relying on version-dependent behavior.
+        // targetSdk 35 (Android 15) enforces edge-to-edge on API 35+ devices regardless of any
+        // setDecorFitsSystemWindows(true) call, but on pre-35 devices the app would otherwise
+        // draw *under* the system bars only if it opts in — without this call the app is
+        // effectively edge-to-edge on 15+ but not on older OS versions, which would make
+        // TopPanel/MenuView's windowInsetsPadding(WindowInsets.statusBars) a no-op there (the
+        // system would already be reserving space for the status bar, so the inset would be
+        // zero). Calling enableEdgeToEdge() here makes the layout edge-to-edge consistently
+        // across all supported versions, so the explicit status bar inset in TopPanel/MenuView
+        // has a real, consistent effect everywhere.
+        enableEdgeToEdge()
         setContent {
             NewsRSSReaderTheme {
                 AppRoot()
