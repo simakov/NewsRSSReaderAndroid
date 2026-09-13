@@ -60,6 +60,11 @@ object FeedParser {
                             resetItemState()
                         }
                         "enclosure" -> if (inItem) {
+                            // Second intentional deviation from iOS parity: iOS unconditionally
+                            // overwrites its captured enclosure URL on every <enclosure> tag, so a
+                            // later empty-url enclosure clears a prior valid image there. This port
+                            // instead keeps the last *non-empty* url, treating an enclosure with no
+                            // url as carrying no information rather than as a signal to clear.
                             val url = parser.getAttributeValue(null, "url")
                             if (!url.isNullOrEmpty()) {
                                 image = url
@@ -116,6 +121,9 @@ object FeedParser {
         if (link.isNullOrBlank()) {
             return UUID.randomUUID().toString()
         }
+        // `link` is already a natural stable key; hashing it is a lossy compression that accepts
+        // a negligible (but nonzero) collision probability in exchange for a short id. If that
+        // ever becomes a real concern, `link` itself can be used directly as the id instead.
         return link.hashCode().toString()
     }
 

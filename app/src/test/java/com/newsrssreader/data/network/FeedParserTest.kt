@@ -15,7 +15,7 @@ class FeedParserTest {
     @Test
     fun `parses RSS 2 dot 0 feed items`() {
         val items = FeedParser.parse(fixture("rss_sample.xml"))
-        assertEquals(3, items.size)
+        assertEquals(4, items.size)
         assertNotNull(items.first().title)
         assertNotNull(items.first().link)
         assertNotNull(items.first().published)
@@ -41,5 +41,15 @@ class FeedParserTest {
         // The third fixture item has two <category> tags: "Спорт" then "Футбол" — last wins.
         val multiCategoryItem = items.first { it.link!!.contains("friendly_match") }
         assertEquals(listOf("Футбол"), multiCategoryItem.categories)
+    }
+
+    @Test
+    fun `a later enclosure with an empty url does not clear a prior valid image`() {
+        val items = FeedParser.parse(fixture("rss_sample.xml"))
+        // The fourth fixture item has two <enclosure> tags: a valid url, then an empty one.
+        // Per the documented deviation from iOS, the empty second enclosure carries no
+        // information and must not overwrite the previously captured valid image.
+        val item = items.first { it.link!!.contains("currency_close") }
+        assertEquals("https://icdn.lenta.ru/images/2026/09/13/currency_close.jpg", item.image)
     }
 }

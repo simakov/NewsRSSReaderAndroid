@@ -31,5 +31,15 @@
       <category>Футбол</category>
       <enclosure url="https://icdn.lenta.ru/images/2026/09/13/friendly_match.jpg" type="image/jpeg" length="0"/>
     </item>
+    <item>
+      <title>Курс валют показал незначительные колебания на закрытии торгов</title>
+      <link>https://lenta.ru/news/2026/09/13/currency_close/</link>
+      <author>Ольга Смирнова</author>
+      <pubDate>Sun, 13 Sep 2026 18:30:00 +0300</pubDate>
+      <description>По итогам торговой сессии курсы основных валют изменились незначительно.</description>
+      <category>Экономика</category>
+      <enclosure url="https://icdn.lenta.ru/images/2026/09/13/currency_close.jpg" type="image/jpeg" length="0"/>
+      <enclosure url="" type="image/jpeg" length="0"/>
+    </item>
   </channel>
 </rss>
