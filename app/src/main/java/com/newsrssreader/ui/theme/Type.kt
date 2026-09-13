@@ -22,4 +22,6 @@ object AppType {
     val imageCaption = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Normal)
     val imageCredit = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal)
     val errorTitle = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    val menuItemSelected = TextStyle(fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+    val menuItemUnselected = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
 }
