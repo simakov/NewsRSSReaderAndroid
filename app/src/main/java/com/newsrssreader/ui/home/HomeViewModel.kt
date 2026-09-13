@@ -6,6 +6,8 @@ import com.newsrssreader.data.model.NewsItem
 import com.newsrssreader.data.network.FeedFetcher
 import com.newsrssreader.data.network.FeedSource
 import com.newsrssreader.data.network.LentaFeedService
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,8 +42,11 @@ class HomeViewModel(
         loadFeeds(source)
     }
 
+    private var loadJob: Job? = null
+
     private fun loadFeeds(source: FeedSource) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             runCatching { feedService.fetchFeed(source) }
                 .onSuccess { feed ->
                     _uiState.value = _uiState.value.copy(
@@ -51,7 +56,8 @@ class HomeViewModel(
                         isShowError = false,
                     )
                 }
-                .onFailure {
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
                     _uiState.value = _uiState.value.copy(isLoading = false, isShowError = true)
                 }
         }
