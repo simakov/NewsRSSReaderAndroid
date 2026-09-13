@@ -44,7 +44,7 @@ fun HomeScreen(
                     NewsRowPlaceholder()
                 }
             } else {
-                itemsIndexed(uiState.rssFeed) { index, item ->
+                itemsIndexed(uiState.rssFeed, key = { _, item -> item.id }) { index, item ->
                     NewsRow(
                         item = item,
                         modifier = Modifier.clickable {

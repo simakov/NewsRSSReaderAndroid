@@ -47,7 +47,7 @@ fun CategoryScreen(
                     NewsRowPlaceholder()
                 }
             } else {
-                itemsIndexed(uiState.news) { index, item ->
+                itemsIndexed(uiState.news, key = { _, item -> item.id }) { index, item ->
                     NewsRow(
                         item = item,
                         modifier = Modifier.clickable {
