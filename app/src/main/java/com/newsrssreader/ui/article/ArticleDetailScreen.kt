@@ -141,7 +141,7 @@ fun ArticleDetailScreen(
                     onState = { state ->
                         if (state is AsyncImagePainter.State.Success) {
                             val size = state.painter.intrinsicSize
-                            if (size.isSpecified && size.height > 0f) {
+                            if (size.isSpecified && size.width > 0f && size.height > 0f) {
                                 aspectRatio = size.width / size.height
                             }
                         }
