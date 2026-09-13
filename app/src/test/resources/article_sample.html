@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><title>Sample article</title></head>
+<body>
+<article>
+  <header class="topic-header">
+    <span class="topic-header__rubric">Экономика</span>
+    <h1 class="topic-header__title">Заголовок статьи</h1>
+  </header>
+
+  <div class="topic-authors">
+    <img class="topic-authors__photo" src="https://icdn.lenta.ru/images/authors/photo.jpg" />
+    <span class="topic-authors__name">Иван Иванов</span>
+    <span class="topic-authors__job">Корреспондент отдела экономики</span>
+  </div>
+
+  <div class="content-body">
+    <p class="_lead">Это первый абзац статьи, он является лид-абзацем и должен быть отмечен как lead.</p>
+    <p>Это обычный абзац без специального класса, идущий сразу после лида.</p>
+    <h2>Подзаголовок раздела</h2>
+    <p>Ещё один обычный абзац после подзаголовка с дополнительной информацией.</p>
+
+    <figure class="picture">
+      <img class="picture__image" src="https://icdn.lenta.ru/images/2026/09/13/photo.jpg" />
+      <figcaption class="description">
+        Основной текст подписи к изображению <span class="description__credits">Фото: РИА Новости</span>
+      </figcaption>
+    </figure>
+
+    <div class="box-quote">
+      <div class="box-quote__content-text">Это цитата, приведённая в статье для иллюстрации мнения.</div>
+      <div class="box-quote__author-name">Пётр Петров</div>
+      <div class="box-quote__author-description">пресс-секретарь компании</div>
+    </div>
+
+    <div class="box-note">
+      <div class="box-note__text">Это врезка с дополнительной справочной информацией по теме статьи.</div>
+    </div>
+
+    <div class="box-inline-topic">
+      <a class="card-inline-topic" href="/news/2026/09/13/related/">
+        <img class="card-inline-topic__image" src="https://icdn.lenta.ru/images/2026/09/13/related.jpg" />
+        <div class="card-inline-topic__rightcol">Краткое описание связанного материала.</div>
+        <div class="card-inline-topic__title">Заголовок связанного материала</div>
+        <div class="card-inline-topic__date">13 сентября 2026, 10:00</div>
+      </a>
+    </div>
+
+    <div class="unrelated-block">
+      <p>Этот параграф находится внутри нераспознаваемого div, но сам параграф — прямой ребёнок content-body, поэтому распознаётся отдельно.</p>
+    </div>
+  </div>
+</article>
+</body>
+</html>
