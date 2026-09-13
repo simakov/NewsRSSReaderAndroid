@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
@@ -40,7 +42,11 @@ fun NewsTop(item: NewsItem?, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(HeroHeight),
+            .height(HeroHeight)
+            // Matches iOS's `.frame(height: 350).clipped()` — guarantees nothing (a tall
+            // image or an unexpectedly long title) can visually bleed past the fixed
+            // hero height into whatever is laid out below it.
+            .clip(RectangleShape),
     ) {
         AsyncImage(
             model = item.image,
@@ -72,6 +78,7 @@ fun NewsTop(item: NewsItem?, modifier: Modifier = Modifier) {
                 text = item.title.orEmpty(),
                 style = AppTheme.type.heroTitle,
                 color = AppTheme.colors.white,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Row {
