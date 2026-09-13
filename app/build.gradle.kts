@@ -32,6 +32,16 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = false
+        }
+    }
+    sourceSets {
+        getByName("test") {
+            resources.srcDirs("src/test/resources")
+        }
+    }
 }
 
 dependencies {
@@ -50,6 +60,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)

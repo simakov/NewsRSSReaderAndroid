@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Лента.ру : Новости</title>
+    <link>https://lenta.ru/</link>
+    <description>Новости от Ленты.Ру</description>
+    <item>
+      <title>Правительство одобрило новый пакет мер поддержки экономики</title>
+      <link>https://lenta.ru/news/2026/09/13/economy_support/</link>
+      <author>Иван Петров</author>
+      <pubDate>Sun, 13 Sep 2026 09:15:00 +0300</pubDate>
+      <description>Кабинет министров утвердил план дополнительных мер по поддержке отраслей экономики.</description>
+      <category>Экономика</category>
+      <enclosure url="https://icdn.lenta.ru/images/2026/09/13/economy_support.jpg" type="image/jpeg" length="0"/>
+    </item>
+    <item>
+      <title>Учёные обнаружили новый вид глубоководных рыб</title>
+      <link>https://lenta.ru/news/2026/09/13/deep_sea_fish/</link>
+      <author>Мария Сидорова</author>
+      <pubDate>Sun, 13 Sep 2026 08:40:00 +0300</pubDate>
+      <description>Экспедиция обнаружила ранее неизвестный вид рыб на глубине более четырёх километров.</description>
+      <category>Наука и техника</category>
+    </item>
+    <item>
+      <title>Сборная выиграла товарищеский матч со счётом 2:1</title>
+      <link>https://lenta.ru/news/2026/09/13/friendly_match/</link>
+      <author>Пётр Кузнецов</author>
+      <pubDate>Sun, 13 Sep 2026 07:05:00 +0300</pubDate>
+      <description>Национальная команда одержала победу в товарищеском матче накануне отборочного турнира.</description>
+      <category>Спорт</category>
+      <category>Футбол</category>
+      <enclosure url="https://icdn.lenta.ru/images/2026/09/13/friendly_match.jpg" type="image/jpeg" length="0"/>
+    </item>
+  </channel>
+</rss>
