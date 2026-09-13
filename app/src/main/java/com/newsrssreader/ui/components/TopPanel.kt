@@ -31,13 +31,13 @@ fun TopPanel(onMenuClick: () -> Unit, modifier: Modifier = Modifier) {
             Icon(
                 imageVector = Icons.Default.Menu,
                 contentDescription = "Menu",
-                tint = AppTheme.colors.black,
+                tint = AppTheme.colors.white,
             )
         }
 
         Text(
             text = "LENTA.RU",
-            color = AppTheme.colors.black,
+            color = AppTheme.colors.white,
             modifier = Modifier
                 .padding(10.dp)
                 .size(width = 120.dp, height = 20.dp),
