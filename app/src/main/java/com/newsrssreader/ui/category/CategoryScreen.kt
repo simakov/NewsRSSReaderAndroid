@@ -18,22 +18,28 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
+import com.newsrssreader.ui.components.TopPanel
 import com.newsrssreader.ui.theme.AppTheme
 
 /**
- * Category feed screen: a title header for the selected category, followed by the same
- * shimmer-while-loading / real-rows-with-dividers list pattern as [com.newsrssreader.ui.home.HomeScreen].
+ * Category feed screen: the same shared header as [com.newsrssreader.ui.home.HomeScreen] (menu
+ * button + logo, matching iOS's `ContentView` header which is rendered above both `Home` and
+ * `CategoryView` so the hamburger menu is reachable from a category feed too, not just Home),
+ * followed by a title header for the selected category and the same shimmer-while-loading /
+ * real-rows-with-dividers list pattern as `HomeScreen`.
  */
 @Composable
 fun CategoryScreen(
     categoryKey: String,
     viewModel: CategoryViewModel = viewModel { CategoryViewModel(categoryKey) },
+    onMenuClick: () -> Unit,
     onArticleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(modifier = modifier.fillMaxSize()) {
+        TopPanel(onMenuClick = onMenuClick)
         Text(
             text = uiState.categoryTitle,
             style = AppTheme.type.categoryHeader,
