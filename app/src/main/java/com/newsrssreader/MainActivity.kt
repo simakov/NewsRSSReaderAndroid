@@ -127,7 +127,11 @@ fun AppRoot() {
                 route = "photo/{encodedUrl}",
                 arguments = listOf(navArgument("encodedUrl") { type = NavType.StringType }),
             ) { entry ->
-                val url = Uri.decode(entry.arguments?.getString("encodedUrl").orEmpty())
+                // Navigation-Compose already decodes the path segment when matching it against
+                // {encodedUrl}, so decoding again here would double-decode any literal
+                // %-encoded sequence embedded in the URL itself (e.g. a CDN proxy URL like
+                // "...?src=https%3A%2F%2F...") and corrupt it.
+                val url = entry.arguments?.getString("encodedUrl").orEmpty()
                 PhotoViewerScreen(
                     imageUrl = url,
                     onBack = { navController.popBackStack() },

@@ -46,7 +46,7 @@ import coil.compose.AsyncImagePainter
 import coil.imageLoader
 import com.newsrssreader.data.saveImageToGallery
 import kotlinx.coroutines.launch
-import kotlin.math.max
+import kotlin.math.min
 
 private const val DEFAULT_SCALE = 1f
 private const val FALLBACK_MAX_SCALE = 3f
@@ -78,14 +78,14 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
         if (size == null || container.width <= 0 || container.height <= 0) {
             return FALLBACK_MAX_SCALE
         }
-        // Displayed size at scale 1f is a fit-to-width render: full container width, height
-        // determined by the image's own aspect ratio (matching ContentScale.Fit against the
-        // container width).
-        val displayedWidth = container.width.toFloat()
-        val displayedHeight = displayedWidth * (size.height / size.width)
-        val scaleForWidth = size.width / displayedWidth
-        val scaleForHeight = size.height / displayedHeight
-        return max(scaleForWidth, scaleForHeight).coerceAtLeast(DEFAULT_SCALE)
+        // ContentScale.Fit scales the intrinsic image down (or up) by whichever factor makes it
+        // fit entirely inside the container - the smaller of the width-fit and height-fit
+        // ratios (landscape images end up width-constrained, portrait images height-constrained,
+        // with letterboxing on the other axis either way). Native resolution (1 image pixel = 1
+        // screen pixel) is reached by zooming in further from that fit scale by its reciprocal.
+        val fitScale = min(container.width / size.width, container.height / size.height)
+        if (fitScale <= 0f) return FALLBACK_MAX_SCALE
+        return (1f / fitScale).coerceAtLeast(DEFAULT_SCALE)
     }
 
     fun clampedOffset(candidate: Offset, currentScale: Float, container: IntSize): Offset {
