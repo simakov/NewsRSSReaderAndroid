@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -31,6 +32,11 @@ import com.newsrssreader.ui.theme.NewsRSSReaderTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Must run before super.onCreate() per the AndroidX Splash Screen API's documented usage
+        // pattern; it takes over the window installed for the Theme.NewsRSSReader.Splash launch
+        // theme (set in the manifest) and swaps back to Theme.NewsRSSReader once the first frame
+        // is drawn.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             NewsRSSReaderTheme {

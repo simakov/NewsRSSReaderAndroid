@@ -1,3 +1,24 @@
 <resources>
     <style name="Theme.NewsRSSReader" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+      Launch-time theme installed via the AndroidX Splash Screen API (see MainActivity's
+      installSplashScreen() call). It owns the window only until the first frame is drawn, at
+      which point the library swaps the activity's theme back to Theme.NewsRSSReader. Using it
+      keeps the cold-start splash consistent across Android versions instead of relying on the
+      OS auto-deriving one from the adaptive launcher icon (inconsistent pre-12, and varies by
+      launcher).
+
+      The icon drawable reused here (@drawable/ic_launcher_foreground) is the same asset used as
+      the adaptive icon's foreground layer: a black 108x108dp square with the white Lenta "L"
+      glyph inset well within the adaptive-icon safe zone. Because its background pixels are
+      already solid black - matching windowSplashScreenBackground below - reusing it directly
+      as the splash icon blends seamlessly with no visible seam or extra masking needed, even
+      though the Splash Screen API does not apply adaptive-icon masking to this drawable.
+    -->
+    <style name="Theme.NewsRSSReader.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#000000</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.NewsRSSReader</item>
+    </style>
 </resources>
