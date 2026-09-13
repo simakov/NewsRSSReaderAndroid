@@ -2,6 +2,7 @@ package com.newsrssreader
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
@@ -9,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.newsrssreader.data.NewsItemCache
@@ -39,15 +42,25 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Top-level composable wiring the whole app together, mirroring the role iOS's `ContentView`
- * plays: it owns the `menuShown` state and the currently-selected category (implicitly, via the
- * nav back stack) above the navigation graph, and hosts the slide-in `MenuView` drawer as an
- * overlay on top of whichever screen is currently showing.
+ * plays: it owns the `menuShown` state above the navigation graph and hosts the slide-in
+ * `MenuView` drawer as an overlay on top of whichever screen is currently showing. The currently
+ * selected category is derived from the nav back stack itself (not hand-tracked state) so the
+ * menu's highlight and the "already there, do nothing" short-circuit always agree with what's
+ * actually on screen.
  */
 @Composable
 fun AppRoot() {
     val navController = rememberNavController()
     var menuShown by remember { mutableStateOf(false) }
-    var selectedCategory by remember { mutableStateOf("") }
+
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val selectedCategory = when (currentRoute) {
+        "category/{key}" -> backStackEntry?.arguments?.getString("key") ?: ""
+        else -> ""
+    }
+
+    BackHandler(enabled = menuShown) { menuShown = false }
 
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = "home") {
@@ -60,8 +73,8 @@ fun AppRoot() {
             composable(
                 route = "category/{key}",
                 arguments = listOf(navArgument("key") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val key = backStackEntry.arguments?.getString("key").orEmpty()
+            ) { entry ->
+                val key = entry.arguments?.getString("key").orEmpty()
                 CategoryScreen(
                     categoryKey = key,
                     onMenuClick = { menuShown = true },
@@ -71,8 +84,8 @@ fun AppRoot() {
             composable(
                 route = "article/{id}",
                 arguments = listOf(navArgument("id") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val id = backStackEntry.arguments?.getString("id").orEmpty()
+            ) { entry ->
+                val id = entry.arguments?.getString("id").orEmpty()
                 val item = NewsItemCache.get(id)
                 if (item != null) {
                     ArticleDetailScreen(
@@ -83,8 +96,10 @@ fun AppRoot() {
                     // Process death (or any other loss of the in-memory cache) can leave us with
                     // an id that no longer resolves to a NewsItem. There is nothing meaningful to
                     // render in that case, so just back out to whatever screen led here instead of
-                    // showing a dead-end "not found" screen.
-                    navController.popBackStack()
+                    // showing a dead-end "not found" screen. Popping the back stack is a
+                    // navigation side effect, so it must run in an effect, not directly in the
+                    // composable body.
+                    LaunchedEffect(id) { navController.popBackStack() }
                 }
             }
         }
@@ -99,15 +114,15 @@ fun AppRoot() {
                 onDismiss = { menuShown = false },
                 onCategorySelected = { key ->
                     menuShown = false
-                    selectedCategory = key
-                    if (key.isEmpty()) {
+                    if (key == selectedCategory) {
+                        // Already there — nothing to do.
+                    } else if (key.isEmpty()) {
                         navController.navigate("home") {
                             popUpTo("home") { inclusive = true }
                         }
                     } else {
                         navController.navigate("category/$key") {
                             popUpTo("home")
-                            launchSingleTop = true
                         }
                     }
                 },
