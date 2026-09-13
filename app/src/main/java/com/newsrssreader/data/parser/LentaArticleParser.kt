@@ -59,7 +59,7 @@ object LentaArticleParser {
         )
     }
 
-    private fun parseContentElement(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType? {
+    private fun parseContentElement(element: HtmlElement): ArticleContentType? {
         return when {
             element.tag == "p" -> {
                 val text = element.text()
@@ -81,7 +81,7 @@ object LentaArticleParser {
         }
     }
 
-    private fun parseAuthor(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.Author? {
+    private fun parseAuthor(element: HtmlElement): ArticleContentType.Author? {
         val name = element.select(".topic-authors__name").firstOrNull()?.text() ?: ""
         if (name.isEmpty()) return null
         val photoRaw = element.select(".topic-authors__photo").firstOrNull()?.attr("src") ?: ""
@@ -90,7 +90,7 @@ object LentaArticleParser {
         return ArticleContentType.Author(name = name, photo = photo, jobTitle = jobTitle)
     }
 
-    private fun parseImage(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.Image? {
+    private fun parseImage(element: HtmlElement): ArticleContentType.Image? {
         // Current live markup: figure.picture-box / img.picture-box__image.
         // Legacy fallback: figure.picture / img.picture__image.
         val url = element.select("img.picture-box__image").firstOrNull()?.attr("src")
@@ -121,7 +121,7 @@ object LentaArticleParser {
         return ArticleContentType.Image(url = url, caption = caption, credit = credit)
     }
 
-    private fun parseQuote(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.Quote? {
+    private fun parseQuote(element: HtmlElement): ArticleContentType.Quote? {
         // Legacy shape kept as a first-try fallback; current live markup nests the quote text
         // (possibly across several <p> tags, flattened via .text()) inside a `.content-body` div
         // that lives INSIDE this box-quote element — unrelated to the top-level body-container
@@ -140,7 +140,7 @@ object LentaArticleParser {
         return ArticleContentType.Quote(text = text, authorName = authorName, authorDescription = authorDescription)
     }
 
-    private fun parseInfoBox(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.InfoBox? {
+    private fun parseInfoBox(element: HtmlElement): ArticleContentType.InfoBox? {
         val text = element.select(".box-note__text").firstOrNull()?.text()
             ?: element.select(".box-small-note__text").firstOrNull()?.text()
             ?: ""
@@ -149,7 +149,7 @@ object LentaArticleParser {
     }
 
     private fun parseRelatedMaterialList(
-        element: com.newsrssreader.data.parser.HtmlElement,
+        element: HtmlElement,
     ): List<ArticleContentType.RelatedMaterial> {
         // Legacy shape: a single `.card-inline-topic` card. Try it first on the whole block.
         val oldCard = element.select(".card-inline-topic").firstOrNull()
@@ -203,7 +203,7 @@ object LentaArticleParser {
         return result
     }
 
-    private fun parseJsonLd(doc: com.newsrssreader.data.parser.HtmlDocument): List<ArticleContentType> {
+    private fun parseJsonLd(doc: HtmlDocument): List<ArticleContentType> {
         val scripts = doc.select("script[type=application/ld+json]")
         for (script in scripts) {
             val result = mutableListOf<ArticleContentType>()

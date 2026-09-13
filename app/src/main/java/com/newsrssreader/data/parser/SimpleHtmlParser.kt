@@ -37,7 +37,7 @@ class HtmlElement(
         val parts = mutableListOf<String>()
         collectText(this, parts)
         val joined = parts.joinToString(" ")
-        return joined.replace(Regex("  +"), " ").trim()
+        return joined.replace(MULTI_SPACE_REGEX, " ").trim()
     }
 
     private fun collectText(element: HtmlElement, out: MutableList<String>) {
@@ -101,6 +101,7 @@ class HtmlElement(
             "area", "base", "br", "col", "embed", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr",
         )
+        private val MULTI_SPACE_REGEX = Regex("  +")
     }
 }
 
@@ -343,9 +344,15 @@ object SimpleHtmlParser {
     }
 
     private fun indexOfIgnoreCase(haystack: String, needle: String, from: Int): Int {
-        val lowerNeedle = needle.lowercase()
-        val lowerHaystack = haystack.lowercase()
-        return lowerHaystack.indexOf(lowerNeedle, from)
+        val maxStart = haystack.length - needle.length
+        var i = from
+        while (i <= maxStart) {
+            if (haystack.regionMatches(i, needle, 0, needle.length, ignoreCase = true)) {
+                return i
+            }
+            i++
+        }
+        return -1
     }
 
     private val NAMED_ENTITIES = mapOf(
