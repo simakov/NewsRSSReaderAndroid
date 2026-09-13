@@ -123,8 +123,9 @@ CategoryScreen ("category/{key}") ──► ArticleDetailScreen
   categories.
 - Selected item: red left bar (3x20dp) + red text (21sp SemiBold).
 - Unselected item: transparent left bar + white text (20sp SemiBold).
-- Categories (from `LentaFeedService`, 14 entries confirmed in source — CLAUDE.md's "15
-  predefined categories" claim is stale/inaccurate; 14 is authoritative, confirmed with the user):
+- Categories (from `LentaFeedService`, 15 entries confirmed in source, matching CLAUDE.md's
+  "15 predefined categories" claim exactly — an earlier research pass miscounted this as 14;
+  corrected 2026-09-13):
   russia→Россия, world→Мир, ussr→Бывший СССР, economics→Экономика, forces→Силовые структуры,
   science→Наука и техника, culture→Культура, sport→Спорт, media→Интернет и СМИ, style→Ценности,
   travel→Путешествия, life→Из жизни, realty→Среда обитания, wellness→Забота о себе,

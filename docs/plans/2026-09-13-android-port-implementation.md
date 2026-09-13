@@ -681,10 +681,10 @@ import org.junit.Test
 class LentaFeedServiceTest {
     @Test
     fun `categories map matches iOS source count and keys`() {
-        // Confirmed against LentaFeedService.swift: 14 entries (CLAUDE.md's "15 predefined
-        // categories" is stale/inaccurate — the user has confirmed 14 is correct, do not "fix"
-        // this back to 15).
-        assertEquals(14, LentaFeedService.categories.size)
+        // Confirmed against LentaFeedService.swift: 15 entries, matching CLAUDE.md exactly.
+        // (An earlier research pass in this project miscounted this as 14 — corrected
+        // 2026-09-13 after the Task 4 implementer re-verified against the Swift source.)
+        assertEquals(15, LentaFeedService.categories.size)
         assertEquals("Россия", LentaFeedService.categories["russia"])
         assertEquals("Победа", LentaFeedService.categories["pobeda80"])
     }
