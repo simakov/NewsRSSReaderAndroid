@@ -1,6 +1,7 @@
 package com.newsrssreader.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -25,7 +26,7 @@ import com.newsrssreader.ui.theme.AppTheme
  * content (plus padding) determine the bar's height rather than forcing a fixed height.
  */
 @Composable
-fun TopPanel(onMenuClick: () -> Unit, modifier: Modifier = Modifier) {
+fun TopPanel(onMenuClick: () -> Unit, onLogoClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     Row(
         // Inset below the status bar first, then let CenterVertically center the icon/text within
         // whatever height remains (content + padding still determine the bar's total height).
@@ -46,6 +47,7 @@ fun TopPanel(onMenuClick: () -> Unit, modifier: Modifier = Modifier) {
             text = "LENTA.RU",
             color = AppTheme.colors.white,
             modifier = Modifier
+                .clickable(onClick = onLogoClick)
                 .padding(10.dp)
                 .size(width = 120.dp, height = 20.dp),
         )

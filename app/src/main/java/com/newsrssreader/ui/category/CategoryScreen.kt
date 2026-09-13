@@ -2,15 +2,20 @@ package com.newsrssreader.ui.category
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -20,6 +25,7 @@ import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.TopPanel
 import com.newsrssreader.ui.theme.AppTheme
+import kotlinx.coroutines.launch
 
 /**
  * Category feed screen: the same shared header as [com.newsrssreader.ui.home.HomeScreen] (menu
@@ -37,9 +43,14 @@ fun CategoryScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     Column(modifier = modifier.fillMaxSize()) {
-        TopPanel(onMenuClick = onMenuClick)
+        TopPanel(
+            onMenuClick = onMenuClick,
+            onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+        )
         Text(
             text = uiState.categoryTitle,
             style = AppTheme.type.categoryHeader,
@@ -47,7 +58,11 @@ fun CategoryScreen(
             modifier = Modifier.padding(top = 10.dp, start = 10.dp),
         )
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+        ) {
             if (uiState.isLoading) {
                 items(7) {
                     NewsRowPlaceholder()

@@ -1,6 +1,7 @@
 package com.newsrssreader.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,7 +37,7 @@ private val HeroHeight = 350.dp
  * call site does, without every caller needing to duplicate the null-check.
  */
 @Composable
-fun NewsTop(item: NewsItem?, modifier: Modifier = Modifier) {
+fun NewsTop(item: NewsItem?, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     if (item?.link == null || item.image == null) return
 
     Box(
@@ -46,7 +47,8 @@ fun NewsTop(item: NewsItem?, modifier: Modifier = Modifier) {
             // Matches iOS's `.frame(height: 350).clipped()` — guarantees nothing (a tall
             // image or an unexpectedly long title) can visually bleed past the fixed
             // hero height into whatever is laid out below it.
-            .clip(RectangleShape),
+            .clip(RectangleShape)
+            .clickable(onClick = onClick),
     ) {
         AsyncImage(
             model = item.image,

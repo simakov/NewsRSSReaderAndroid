@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -47,7 +48,10 @@ fun MenuView(
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
-            ) {},
+            ) {}
+            // Inset above the gesture/button navigation bar so the last category item isn't
+            // drawn underneath it, mirroring the status-bar inset applied to the header Row.
+            .windowInsetsPadding(WindowInsets.navigationBars),
     ) {
         Row(
             // Same status-bar-inset-then-center treatment as TopPanel: inset below the status
