@@ -24,11 +24,16 @@ import java.io.FileOutputStream
  * rest of the app's UI language.
  */
 suspend fun saveImageToGallery(context: Context, imageLoader: ImageLoader, imageUrl: String): Boolean {
-    val bitmap = loadBitmap(context, imageLoader, imageUrl)
-    if (bitmap == null) {
+    val loaded = loadBitmap(context, imageLoader, imageUrl)
+    if (loaded == null) {
         showToast(context, "Не удалось сохранить изображение")
         return false
     }
+    // Defensive copy: when the loaded drawable was a BitmapDrawable, the returned Bitmap is
+    // Coil's own cached instance, still owned by its memory cache and eligible for recycling
+    // under memory pressure while the compress/write below is in flight. Compress our own copy
+    // instead of the cache's bitmap.
+    val bitmap = loaded.copy(loaded.config ?: Bitmap.Config.ARGB_8888, false)
 
     val fileName = fileNameFor(imageUrl)
     val saved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -115,6 +120,7 @@ private fun saveViaLegacyStorage(context: Context, bitmap: Bitmap, fileName: Str
     }
 }
 
-private fun showToast(context: Context, message: String) {
+/** Exposed (not private) so callers like the photo viewer can reuse it for related feedback, e.g. permission-denial messages using the same Russian-UI Toast convention. */
+internal fun showToast(context: Context, message: String) {
     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }

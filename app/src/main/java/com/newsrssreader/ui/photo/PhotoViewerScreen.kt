@@ -45,6 +45,7 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.imageLoader
 import com.newsrssreader.data.saveImageToGallery
+import com.newsrssreader.data.showToast
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
@@ -107,6 +108,8 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
             coroutineScope.launch {
                 saveImageToGallery(context, context.imageLoader, imageUrl)
             }
+        } else {
+            showToast(context, "Нужно разрешение для сохранения фото")
         }
     }
 
@@ -188,8 +191,12 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val newScale = (scale.value * zoom).coerceIn(DEFAULT_SCALE, maxScale())
+                            // graphicsLayer's translationX/Y is a raw pixel offset that is not
+                            // itself scaled by scaleX/Y, so the pan delta from the gesture is
+                            // applied as-is (no zoom-ratio multiplier) - multiplying it distorted
+                            // tracking during simultaneous pinch+pan.
                             val newOffset = clampedOffset(
-                                offset.value + pan.times(newScale / scale.value.coerceAtLeast(0.01f)),
+                                offset.value + pan,
                                 newScale,
                                 containerSize,
                             )
