@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 
 enum class FeedSource(val path: String) {
     TOP7("top7"),
@@ -48,6 +49,9 @@ object LentaFeedService : FeedFetcher {
             }
             val request = Request.Builder().url(url).build()
             client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("Unexpected response ${response.code} for $url")
+                }
                 val body = response.body?.string() ?: return@use emptyList()
                 FeedParser.parse(body)
             }
