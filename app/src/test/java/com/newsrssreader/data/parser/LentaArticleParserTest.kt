@@ -55,6 +55,24 @@ class LentaArticleParserTest {
     }
 
     @Test
+    fun `image caption is null when figcaption has no credits, matching iOS`() {
+        val html = """
+            <div class="content-body">
+              <figure class="picture">
+                <img class="picture__image" src="https://icdn.lenta.ru/images/no-credit.jpg" />
+                <figcaption class="description">Подпись без указания автора фото</figcaption>
+              </figure>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val image = content.content.filterIsInstance<ArticleContentType.Image>().first()
+        assertEquals("https://icdn.lenta.ru/images/no-credit.jpg", image.url)
+        assertNull(image.credit)
+        assertNull(image.caption)
+    }
+
+    @Test
     fun `parses quote box`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())

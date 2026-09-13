@@ -85,13 +85,14 @@ object LentaArticleParser {
 
         val figcaption = element.select("figcaption.description").firstOrNull()
         val credit = figcaption?.select(".description__credits")?.firstOrNull()?.text()
-        var caption = figcaption?.text()
-        if (!caption.isNullOrEmpty() && !credit.isNullOrEmpty()) {
-            caption = caption.replace(credit, "").trim()
+        // Matches iOS: caption is only ever computed when credit is non-null/non-empty;
+        // a figcaption with no `.description__credits` child yields caption = null,
+        // even if the figcaption has other text.
+        val caption = if (!credit.isNullOrEmpty()) {
+            figcaption?.text()?.replace(credit, "")?.trim()?.takeIf { it.isNotEmpty() }
         } else {
-            caption = caption?.trim()
+            null
         }
-        if (caption.isNullOrEmpty()) caption = null
 
         return ArticleContentType.Image(url = url, caption = caption, credit = credit)
     }
