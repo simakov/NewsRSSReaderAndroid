@@ -20,7 +20,7 @@ Single-module Compose app, MVVM, `StateFlow`-driven state (Kotlin analog of `@Pu
 com.newsrssreader/
 ├── data/
 │   ├── model/          // NewsItem, ArticleContent, ArticleContentType
-│   ├── network/         // LentaFeedService (OkHttp) + RSS/Atom/JSON parser (XmlPullParser)
+│   ├── network/         // LentaFeedService (OkHttp) + RSS 2.0 parser (XmlPullParser)
 │   └── parser/          // LentaArticleParser (article HTML -> ArticleContent)
 ├── ui/
 │   ├── theme/            // Color.kt, Type.kt, Theme.kt
@@ -123,9 +123,8 @@ CategoryScreen ("category/{key}") ──► ArticleDetailScreen
   categories.
 - Selected item: red left bar (3x20dp) + red text (21sp SemiBold).
 - Unselected item: transparent left bar + white text (20sp SemiBold).
-- Categories (from `LentaFeedService`, 14 entries found in source — CLAUDE.md mentions "15
-  predefined categories" but the actual source dictionary has 14; treated as authoritative per
-  user decision):
+- Categories (from `LentaFeedService`, 14 entries confirmed in source — CLAUDE.md's "15
+  predefined categories" claim is stale/inaccurate; 14 is authoritative, confirmed with the user):
   russia→Россия, world→Мир, ussr→Бывший СССР, economics→Экономика, forces→Силовые структуры,
   science→Наука и техника, culture→Культура, sport→Спорт, media→Интернет и СМИ, style→Ценности,
   travel→Путешествия, life→Из жизни, realty→Среда обитания, wellness→Забота о себе,
@@ -162,6 +161,10 @@ CategoryScreen ("category/{key}") ──► ArticleDetailScreen
 - `NewsItem`: id, title, summary, authors, link, updated, categories, content, published,
   source, rights, image. `publishedDate()`: empty if `published` is null; `"HH:mm"` if same
   calendar day as today; else `"d.MM HH:mm"`.
+  **Deviation from iOS**: iOS's `NewsItem.id` is a fresh random `UUID` per parse (not stable
+  across re-fetches). Android derives a stable `id` from the item's `link` instead, since
+  Navigation-Compose routes need a stable key for `"article/{id}"` navigation — confirmed with
+  the user (2026-09-13).
 - `ArticleContentType` (sealed class): `Paragraph(text, isLead)`, `Subheading(text)`,
   `Image(url, caption?, credit?)`, `Quote(text, authorName, authorDescription?)`,
   `Author(name, photo?, jobTitle?)`, `InfoBox(text)`,
@@ -172,8 +175,10 @@ CategoryScreen ("category/{key}") ──► ArticleDetailScreen
 - `LentaFeedService` singleton, OkHttp client.
 - URL pattern: `https://lenta.ru/rss/{source}[/{category}]`, `source` ∈ {top7, last24,
   news(="all")}.
-- Feed parsing: hand-rolled `XmlPullParser`-based parser supporting RSS 2.0, Atom, and JSON feed
-  variants (same three formats the iOS app parses).
+- Feed parsing: hand-rolled `XmlPullParser`-based RSS 2.0 parser. Source verification
+  (2026-09-13) confirmed the iOS app's `LentaRSSParser.swift` only ever parses RSS 2.0 — CLAUDE.md's
+  claim of Atom/JSON support is stale documentation, not actual behavior. Confirmed with the user
+  to match iOS's real RSS-2.0-only parity rather than the stale doc.
 - Article HTML parsing: hand-rolled parser (no Jsoup), producing `ArticleContent`.
 
 ### HomeViewModel
@@ -185,7 +190,7 @@ CategoryScreen ("category/{key}") ──► ArticleDetailScreen
 
 ## Testing / Verification Plan
 
-- Unit tests for the RSS/Atom/JSON parser against fixture payloads.
+- Unit tests for the RSS 2.0 parser against fixture payloads.
 - Unit tests for `NewsItem.publishedDate()` date-formatting logic (today vs. other day).
 - Manual verification: launch app in Android emulator, compare each screen side-by-side against
   iOS simulator screenshots (Home, Category, Article detail, Menu, loading/shimmer, error state).

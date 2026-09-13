@@ -471,24 +471,58 @@ git commit -m "Add NewsItem and ArticleContent models with date formatting tests
 
 ---
 
-## Task 3: Feed XML parser (RSS 2.0 / Atom / JSON)
+## Task 3: Feed RSS 2.0 parser
+
+> **Revised after source verification (2026-09-13):** the iOS app's actual `LentaRSSParser.swift`
+> only ever parses RSS 2.0 — there is no Atom or JSON feed parser anywhere in the codebase,
+> despite CLAUDE.md's stale claim otherwise. `LentaFeedService.getFeed` calls `LentaRSSParser`
+> unconditionally. The Android port replicates RSS-2.0-only parity, confirmed with the user.
+> `NewsItem.id` in iOS is a fresh random UUID per parse (not stable); the Android port instead
+> derives a **stable id from the item's `link`** (e.g. a hash of the link string, or the link
+> itself), confirmed with the user, since Navigation-Compose routes need a stable key.
 
 **Files:**
 - Create: `app/src/main/java/com/newsrssreader/data/network/FeedParser.kt`
 - Test: `app/src/test/java/com/newsrssreader/data/network/FeedParserTest.kt`
-- Test fixtures: `app/src/test/resources/rss_sample.xml`, `app/src/test/resources/atom_sample.xml`, `app/src/test/resources/json_sample.json`
+- Test fixtures: `app/src/test/resources/rss_sample.xml`
 
-Reference the original Swift parser for exact field-mapping behavior — read
-`/Volumes/Data/Apps/TestApps/NewsRSSReader/NewsRSSReaderShared/Services/LentaFeedService.swift`
-(and any `*Parser.swift` it delegates to) in the iOS repo before writing this task's code, to
-replicate: which XML tags map to which `NewsItem` fields (title/link/pubDate/description/
-enclosure image/category), date parsing formats used by Lenta's feeds, and JSON feed field names.
+**Exact field mapping to replicate** (verified against
+`/Volumes/Data/Apps/TestApps/NewsRSSReader/NewsRSSReaderShared/Services/LentaRSSParser.swift`):
 
-**Step 1: Write fixture files**
+Inside each `<item>`:
+- `<title>` → `NewsItem.title` (trimmed)
+- `<link>` → `NewsItem.link` (trimmed)
+- `<author>` → `NewsItem.authors` = single-element `listOf(author)`, or `null` if empty after trim
+- `<description>` → `NewsItem.summary` (trimmed, `null` if empty)
+- `<category>` → `NewsItem.categories` = single-element `listOf(category)` (only the **last**
+  `<category>` tag's text wins if there are multiple — do not accumulate into a multi-element
+  list; this is a deliberate parity quirk with the iOS parser, not a bug to "fix")
+- `<pubDate>` → parsed with format `"EEE, dd MMM yyyy HH:mm:ss Z"`, `Locale("en", "US")` — assign
+  the **same** parsed `Date` to both `NewsItem.published` and `NewsItem.updated` (iOS has no
+  separate "updated" source field; both mirror `pubDate`). If parsing fails, both fields become
+  `null` — no error thrown, no fallback format attempted.
+- `<enclosure url="...">` → its `url` **attribute** (not element text) → `NewsItem.image`, `null`
+  if empty. If multiple `<enclosure>` elements appear, the **last** one wins (overwrite, no
+  MIME-type filtering, no "best" selection logic) — parity quirk, keep as-is.
+- `<guid>` is **not** read/mapped by iOS at all — do not map it either.
+- `NewsItem.content`, `NewsItem.rights`, `NewsItem.source` are always `null` from this parser
+  (iOS leaves them `null` too — nothing in RSS 2.0 items maps to them here).
+- `NewsItem.id`: **Android-specific deviation from iOS** — derive as a stable value from `link`
+  (e.g. `link.hashCode().toString()`, or use `link` itself as the id if non-null; fall back to a
+  random UUID only if `link` is null/blank, which should not happen in practice for real feed
+  items).
 
-Use small real Lenta.ru-shaped payloads (2-3 items each) for `rss_sample.xml` (RSS 2.0 with
-`<enclosure url=... type="image/jpeg">` for images), `atom_sample.xml` (Atom with `<link>`,
-`<updated>`, `<content>`), and `json_sample.json` (JSON Feed 1.1 shape with `items[]`).
+No HTML-entity decoding or CDATA-specific handling needed beyond what `XmlPullParser`'s standard
+text/CDATA event handling already provides by default (mirrors iOS's reliance on `XMLParser`
+defaults — do not add a custom entity decoder for feed parsing).
+
+**Step 1: Write the fixture file**
+
+Create `rss_sample.xml` — a small (3-item) real Lenta.ru-shaped RSS 2.0 payload, each item with
+`<title>`, `<link>`, `<pubDate>` (valid `"EEE, dd MMM yyyy HH:mm:ss Z"` format), `<description>`,
+`<category>`, and `<enclosure url="..." type="image/jpeg" length="0"/>`. Include one item with a
+missing `<enclosure>` (to test the null-image path) and one item with two `<category>` tags (to
+verify last-wins behavior is intentionally preserved).
 
 **Step 2: Write the failing test**
 
@@ -497,6 +531,7 @@ package com.newsrssreader.data.network
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class FeedParserTest {
@@ -510,23 +545,35 @@ class FeedParserTest {
         assertNotNull(items.first().title)
         assertNotNull(items.first().link)
         assertNotNull(items.first().published)
+        assertEquals(items.first().published, items.first().updated)
     }
 
     @Test
-    fun `parses Atom feed items`() {
-        val items = FeedParser.parse(fixture("atom_sample.xml"))
-        assertEquals(3, items.size)
-        assertNotNull(items.first().title)
+    fun `item id is stable and derived from link, not random`() {
+        val items1 = FeedParser.parse(fixture("rss_sample.xml"))
+        val items2 = FeedParser.parse(fixture("rss_sample.xml"))
+        assertEquals(items1.first().id, items2.first().id)
     }
 
     @Test
-    fun `parses JSON feed items`() {
-        val items = FeedParser.parse(fixture("json_sample.json"))
-        assertEquals(3, items.size)
-        assertNotNull(items.first().title)
+    fun `missing enclosure yields null image`() {
+        val items = FeedParser.parse(fixture("rss_sample.xml"))
+        assertNull(items.first { it.image == null }.image)
+    }
+
+    @Test
+    fun `last category tag wins when multiple are present`() {
+        val items = FeedParser.parse(fixture("rss_sample.xml"))
+        // Whichever fixture item has two <category> tags — assert categories has exactly 1
+        // element and it equals the LAST tag's text, not the first.
+        val multiCategoryItem = items.first { it.categories?.isNotEmpty() == true }
+        assertEquals(1, multiCategoryItem.categories?.size)
     }
 }
 ```
+
+Adjust exact assertions once the fixture's specific sample text is written (the test author needs
+to know which fixture item has the dual `<category>` tags and what the last one's text is).
 
 **Step 3: Run test to verify it fails**
 
@@ -535,26 +582,20 @@ Expected: FAIL (`FeedParser` doesn't exist)
 
 **Step 4: Implement `FeedParser.kt`**
 
-Format detection: JSON if the trimmed payload starts with `{`; otherwise XML — parse with
-`android.util.Xml.newPullParser()` (`XmlPullParser`), branch on root element name (`rss` vs
-`feed`) to decide RSS-2.0-tag-set vs Atom-tag-set. Use `org.json.JSONObject`/`JSONArray` (built
-into the Android SDK, no extra dependency) for the JSON branch.
-
-Implement field mapping exactly as found in the iOS `LentaFeedService`/parser during Step 0
-research above (image extraction from `<enclosure>` for RSS, from a `<link rel="enclosure">` or
-custom element for Atom, and from an `image`/`thumbnail` field for JSON — confirm against the
-Swift source, don't guess).
+Parse with `android.util.Xml.newPullParser()` (`XmlPullParser`, built into the Android SDK, no
+extra dependency), implementing the exact field mapping above. Object with a single
+`fun parse(xml: String): List<NewsItem>` entry point.
 
 **Step 5: Run test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.newsrssreader.data.network.FeedParserTest"`
-Expected: PASS (3 tests)
+Expected: PASS (4 tests)
 
 **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/com/newsrssreader/data/network app/src/test
-git commit -m "Add RSS/Atom/JSON feed parser with fixture tests"
+git commit -m "Add RSS 2.0 feed parser with fixture tests"
 ```
 
 ---
@@ -640,15 +681,15 @@ import org.junit.Test
 class LentaFeedServiceTest {
     @Test
     fun `categories map matches iOS source count and keys`() {
-        assertEquals(15, LentaFeedService.categories.size)
+        // Confirmed against LentaFeedService.swift: 14 entries (CLAUDE.md's "15 predefined
+        // categories" is stale/inaccurate — the user has confirmed 14 is correct, do not "fix"
+        // this back to 15).
+        assertEquals(14, LentaFeedService.categories.size)
         assertEquals("Россия", LentaFeedService.categories["russia"])
+        assertEquals("Победа", LentaFeedService.categories["pobeda80"])
     }
 }
 ```
-
-Note: adjust the expected count/keys to whatever Task 4's research step confirms against the
-Swift source (the design doc lists 14 found during initial research — verify precisely here,
-since this test is the source of truth check).
 
 **Step 3: Run test, verify pass**
 
