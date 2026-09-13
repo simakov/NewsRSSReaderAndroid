@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,9 +27,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import com.newsrssreader.data.model.ArticleContentType
 import com.newsrssreader.data.model.NewsItem
 import com.newsrssreader.ui.components.article.AuthorBlock
@@ -123,12 +129,26 @@ fun ArticleDetailScreen(
             )
 
             if (newsItem.image != null) {
+                // Unknown until the image finishes loading; a 16:9 default matches typical
+                // Lenta.ru article photo proportions so there's no jarring 0-height flash
+                // before the real aspect ratio is known.
+                var aspectRatio by remember(newsItem.image) { mutableFloatStateOf(16f / 9f) }
+
                 AsyncImage(
                     model = newsItem.image,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
+                    onState = { state ->
+                        if (state is AsyncImagePainter.State.Success) {
+                            val size = state.painter.intrinsicSize
+                            if (size.isSpecified && size.height > 0f) {
+                                aspectRatio = size.width / size.height
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .aspectRatio(aspectRatio)
                         .background(AppTheme.colors.gray.copy(alpha = 0.2f))
                         .padding(bottom = 16.dp),
                 )
