@@ -37,7 +37,7 @@ fun Modifier.shimmer(): Modifier = composed {
         initialValue = -0.3f,
         targetValue = 1.3f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = LinearEasing),
+            animation = tween(durationMillis = 1500, delayMillis = 250, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "shimmerProgress",
@@ -52,7 +52,7 @@ fun Modifier.shimmer(): Modifier = composed {
 
             val diagonal = size.width + size.height
             val bandCenter = progress * diagonal
-            val bandHalfWidth = diagonal * 0.3f
+            val bandHalfWidth = diagonal * 0.15f
             val start = Offset(bandCenter - bandHalfWidth, bandCenter - bandHalfWidth)
             val end = Offset(bandCenter + bandHalfWidth, bandCenter + bandHalfWidth)
 
