@@ -19,6 +19,8 @@ data class NewsItem(
     val rights: String? = null,
     val image: String? = null,
 ) {
+    // Assumes Locale.getDefault() resolves to a Gregorian calendar (matches the iOS
+    // counterpart's assumption); not hardcoded to Locale.US since the patterns are numeric-only.
     fun publishedDate(): String {
         val published = this.published ?: return ""
         val now = Calendar.getInstance()
