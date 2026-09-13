@@ -43,19 +43,61 @@ class LentaArticleParserTest {
     }
 
     @Test
-    fun `parses image figure with caption and credit`() {
+    fun `parses image figure with caption and credit from current picture-box markup`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())
 
         val image = content.content.filterIsInstance<ArticleContentType.Image>().first()
         assertEquals("https://icdn.lenta.ru/images/2026/09/13/photo.jpg", image.url)
         assertEquals("Фото: РИА Новости", image.credit)
+        assertEquals("Основной текст подписи к изображению", image.caption)
+    }
+
+    @Test
+    fun `image caption is null when new-shape figcaption has no caption paragraph`() {
+        val html = """
+            <div class="content-body">
+              <figure class="picture-box">
+                <img class="picture-box__image" src="https://icdn.lenta.ru/images/no-caption.jpg" />
+                <figcaption class="picture-box__description">
+                  <div class="description-block">
+                    <p class="description-block__credits">Фото: РИА Новости</p>
+                  </div>
+                </figcaption>
+              </figure>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val image = content.content.filterIsInstance<ArticleContentType.Image>().first()
+        assertEquals("https://icdn.lenta.ru/images/no-caption.jpg", image.url)
+        assertEquals("Фото: РИА Новости", image.credit)
+        assertNull(image.caption)
+    }
+
+    @Test
+    fun `image parses from legacy figure picture shape with caption and credit, fallback path`() {
+        val html = """
+            <div class="content-body">
+              <figure class="picture">
+                <img class="picture__image" src="https://icdn.lenta.ru/images/legacy.jpg" />
+                <figcaption class="description">
+                  Основной текст подписи <span class="description__credits">Фото: РИА Новости</span>
+                </figcaption>
+              </figure>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val image = content.content.filterIsInstance<ArticleContentType.Image>().first()
+        assertEquals("https://icdn.lenta.ru/images/legacy.jpg", image.url)
+        assertEquals("Фото: РИА Новости", image.credit)
         assertTrue(image.caption?.contains("Основной текст подписи") == true)
         assertFalse(image.caption?.contains("Фото: РИА Новости") == true)
     }
 
     @Test
-    fun `image caption is null when figcaption has no credits, matching iOS`() {
+    fun `image caption is null when legacy figcaption has no credits, matching iOS`() {
         val html = """
             <div class="content-body">
               <figure class="picture">
@@ -73,7 +115,7 @@ class LentaArticleParserTest {
     }
 
     @Test
-    fun `parses quote box`() {
+    fun `parses quote box from current nested content-body markup with author present`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())
 
@@ -84,24 +126,108 @@ class LentaArticleParserTest {
     }
 
     @Test
-    fun `parses info box`() {
+    fun `parses quote box from current nested content-body markup with no author wrapper`() {
+        val html = """
+            <div class="content-body">
+              <div class="box-quote">
+                <div class="content-body js-topic-body-content _no-mobile-padding _quotebox-body">
+                  <p>Первая часть цитаты.</p>
+                  <p>Вторая часть цитаты.</p>
+                </div>
+              </div>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val quote = content.content.filterIsInstance<ArticleContentType.Quote>().first()
+        assertTrue(quote.text.contains("Первая часть цитаты."))
+        assertTrue(quote.text.contains("Вторая часть цитаты."))
+        assertEquals("", quote.authorName)
+        assertNull(quote.authorDescription)
+    }
+
+    @Test
+    fun `parses quote box from legacy box-quote__content-text shape, fallback path`() {
+        val html = """
+            <div class="content-body">
+              <div class="box-quote">
+                <div class="box-quote__content-text">Это цитата из старого шаблона.</div>
+                <div class="box-quote__author-name">Пётр Петров</div>
+                <div class="box-quote__author-description">пресс-секретарь компании</div>
+              </div>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val quote = content.content.filterIsInstance<ArticleContentType.Quote>().first()
+        assertEquals("Это цитата из старого шаблона.", quote.text)
+        assertEquals("Пётр Петров", quote.authorName)
+        assertEquals("пресс-секретарь компании", quote.authorDescription)
+    }
+
+    @Test
+    fun `parses info box from box-note`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())
 
-        val infoBox = content.content.filterIsInstance<ArticleContentType.InfoBox>().first()
+        val infoBox = content.content.filterIsInstance<ArticleContentType.InfoBox>()
+            .first { it.text.contains("врезка с дополнительной") }
         assertTrue(infoBox.text.contains("врезка"))
     }
 
     @Test
-    fun `parses related material with url normalization and null date`() {
+    fun `parses info box from box-small-note`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())
 
-        val related = content.content.filterIsInstance<ArticleContentType.RelatedMaterial>().first()
-        assertEquals("Заголовок связанного материала", related.title)
-        assertEquals("Краткое описание связанного материала.", related.description)
-        assertEquals("https://lenta.ru/news/2026/09/13/related/", related.articleUrl)
-        assertNull(related.date)
+        val infoBox = content.content.filterIsInstance<ArticleContentType.InfoBox>()
+            .first { it.text.contains("маленькая врезка") }
+        assertTrue(infoBox.text.contains("маленькая врезка"))
+    }
+
+    @Test
+    fun `parses related material carousel with two items from current box-inline-topic markup`() {
+        val html = fixture("article_sample.html")
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val related = content.content.filterIsInstance<ArticleContentType.RelatedMaterial>()
+        assertEquals(2, related.size)
+
+        val first = related[0]
+        assertEquals("Заголовок связанного материала", first.title)
+        assertEquals("Краткое описание связанного материала.", first.description)
+        assertEquals("https://lenta.ru/news/2026/09/13/related/", first.articleUrl)
+        assertNull(first.date)
+
+        val second = related[1]
+        assertEquals("Второй связанный материал", second.title)
+        assertEquals("Описание второго связанного материала.", second.description)
+        assertEquals("https://lenta.ru/news/2026/09/13/related2/", second.articleUrl)
+        assertNull(second.date)
+    }
+
+    @Test
+    fun `parses related material from legacy single-card shape, fallback path`() {
+        val html = """
+            <div class="content-body">
+              <div class="box-inline-topic">
+                <a class="card-inline-topic" href="/news/2026/09/13/related/">
+                  <img class="card-inline-topic__image" src="https://icdn.lenta.ru/images/2026/09/13/related.jpg" />
+                  <div class="card-inline-topic__rightcol">Краткое описание связанного материала.</div>
+                  <div class="card-inline-topic__title">Заголовок связанного материала</div>
+                  <div class="card-inline-topic__date">13 сентября 2026, 10:00</div>
+                </a>
+              </div>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        val related = content.content.filterIsInstance<ArticleContentType.RelatedMaterial>()
+        assertEquals(1, related.size)
+        assertEquals("Заголовок связанного материала", related.first().title)
+        assertEquals("Краткое описание связанного материала.", related.first().description)
+        assertEquals("https://lenta.ru/news/2026/09/13/related/", related.first().articleUrl)
+        assertNull(related.first().date)
     }
 
     @Test
@@ -118,11 +244,29 @@ class LentaArticleParserTest {
     }
 
     @Test
-    fun `category extracted from topic-header__rubric`() {
+    fun `category extracted from legacy topic-header__rubric, fallback path`() {
         val html = fixture("article_sample.html")
         val content = LentaArticleParser.parse(html, sampleNewsItem())
 
+        // article_sample.html carries both the legacy rubric span AND the new common-head links;
+        // the legacy selector is tried first, so it wins here.
         assertEquals("Экономика", content.category)
+    }
+
+    @Test
+    fun `category extracted from current common-head__info-text rubrics link`() {
+        val html = """
+            <div class="common-head">
+              <a class="common-head__info-text" href="/rubrics/world/">Мир</a>
+              <a class="common-head__info-text" href="/news/2026/09/13/related/">13:00, 13 сентября 2026</a>
+            </div>
+            <div class="content-body">
+              <p>Текст статьи.</p>
+            </div>
+        """.trimIndent()
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        assertEquals("Мир", content.category)
     }
 
     @Test

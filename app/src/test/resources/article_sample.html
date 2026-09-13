@@ -8,6 +8,11 @@
     <h1 class="topic-header__title">Заголовок статьи</h1>
   </header>
 
+  <div class="common-head">
+    <a class="common-head__info-text" href="/rubrics/economics/">Экономика</a>
+    <a class="common-head__info-text" href="/news/2026/09/13/related/">13:00, 13 сентября 2026</a>
+  </div>
+
   <div class="topic-authors">
     <img class="topic-authors__photo" src="https://icdn.lenta.ru/images/authors/photo.jpg" />
     <span class="topic-authors__name">Иван Иванов</span>
@@ -20,30 +25,60 @@
     <h2>Подзаголовок раздела</h2>
     <p>Ещё один обычный абзац после подзаголовка с дополнительной информацией.</p>
 
-    <figure class="picture">
-      <img class="picture__image" src="https://icdn.lenta.ru/images/2026/09/13/photo.jpg" />
-      <figcaption class="description">
-        Основной текст подписи к изображению <span class="description__credits">Фото: РИА Новости</span>
+    <figure class="picture-box">
+      <div class="picture-box__image-block">
+        <img class="picture-box__image" src="https://icdn.lenta.ru/images/2026/09/13/photo.jpg" />
+      </div>
+      <figcaption class="picture-box__description">
+        <div class="description-block">
+          <p class="description-block__caption">Основной текст подписи к изображению</p>
+          <p class="description-block__credits">Фото: РИА Новости</p>
+        </div>
       </figcaption>
     </figure>
 
     <div class="box-quote">
-      <div class="box-quote__content-text">Это цитата, приведённая в статье для иллюстрации мнения.</div>
-      <div class="box-quote__author-name">Пётр Петров</div>
-      <div class="box-quote__author-description">пресс-секретарь компании</div>
+      <div class="content-body js-topic-body-content _no-mobile-padding _quotebox-body">
+        <p>Это цитата, приведённая в статье для иллюстрации мнения.</p>
+      </div>
+      <div class="box-quote__author">
+        <img class="box-quote__author-photo" src="https://icdn.lenta.ru/images/authors/quote.jpg" />
+        <span class="box-quote__author-name">Пётр Петров</span>
+        <span class="box-quote__author-description">пресс-секретарь компании</span>
+      </div>
     </div>
 
     <div class="box-note">
       <div class="box-note__text">Это врезка с дополнительной справочной информацией по теме статьи.</div>
     </div>
 
+    <div class="box-small-note">
+      <div class="box-small-note__text">Это маленькая врезка с короткой справкой.</div>
+    </div>
+
     <div class="box-inline-topic">
-      <a class="card-inline-topic" href="/news/2026/09/13/related/">
-        <img class="card-inline-topic__image" src="https://icdn.lenta.ru/images/2026/09/13/related.jpg" />
-        <div class="card-inline-topic__rightcol">Краткое описание связанного материала.</div>
-        <div class="card-inline-topic__title">Заголовок связанного материала</div>
-        <div class="card-inline-topic__date">13 сентября 2026, 10:00</div>
-      </a>
+      <div class="box-inline-topic__box-name">Материалы по теме</div>
+      <div class="box-inline-topic__wrap">
+        <div class="box-inline-topic__item">
+          <a class="box-inline-topic__link" href="/news/2026/09/13/related/">
+            <img class="box-inline-topic__image" src="https://icdn.lenta.ru/images/2026/09/13/related.jpg" />
+            <div class="box-inline-topic__topic">Экономика</div>
+            <div class="box-inline-topic__title">Заголовок связанного материала</div>
+            <div class="box-inline-topic__rightcol">Краткое описание связанного материала.</div>
+            <div class="box-inline-topic__other-info">
+              <div class="box-inline-topic__date">13 сентября 2026, 10:00</div>
+            </div>
+          </a>
+        </div>
+        <div class="box-inline-topic__item">
+          <a class="box-inline-topic__link" href="https://lenta.ru/news/2026/09/13/related2/">
+            <img class="box-inline-topic__image" src="https://icdn.lenta.ru/images/2026/09/13/related2.jpg" />
+            <div class="box-inline-topic__topic">Экономика</div>
+            <div class="box-inline-topic__title">Второй связанный материал</div>
+            <div class="box-inline-topic__rightcol">Описание второго связанного материала.</div>
+          </a>
+        </div>
+      </div>
     </div>
 
     <div class="unrelated-block">

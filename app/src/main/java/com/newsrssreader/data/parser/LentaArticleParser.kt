@@ -17,7 +17,11 @@ object LentaArticleParser {
     fun parse(html: String, newsItem: NewsItem): ArticleContent {
         val doc = SimpleHtmlParser.parse(html)
 
+        // Old template used a plain rubric span; current live markup instead exposes the
+        // category as one of possibly several `a.common-head__info-text` links (the other one
+        // being a timestamp link), distinguished by an href starting with "/rubrics/".
         val category = doc.select(".topic-header__rubric").firstOrNull()?.text()
+            ?: doc.select("a.common-head__info-text[href^=/rubrics/]").firstOrNull()?.text()
 
         val content = mutableListOf<ArticleContentType>()
 
@@ -32,7 +36,13 @@ object LentaArticleParser {
 
         if (body != null) {
             for (child in body.children()) {
-                parseContentElement(child)?.let { content.add(it) }
+                if (child.tag == "div" && child.hasClass("box-inline-topic")) {
+                    // Related-material blocks are a carousel that can hold zero or more items,
+                    // unlike every other block type below which yields at most one content entry.
+                    content.addAll(parseRelatedMaterialList(child))
+                } else {
+                    parseContentElement(child)?.let { content.add(it) }
+                }
             }
         }
 
@@ -62,10 +72,11 @@ object LentaArticleParser {
                 if (text.isEmpty()) return null
                 ArticleContentType.Subheading(text = text)
             }
-            element.tag == "figure" && element.hasClass("picture") -> parseImage(element)
+            element.tag == "figure" && (element.hasClass("picture-box") || element.hasClass("picture")) ->
+                parseImage(element)
             element.tag == "div" && element.hasClass("box-quote") -> parseQuote(element)
-            element.tag == "div" && element.hasClass("box-note") -> parseInfoBox(element)
-            element.tag == "div" && element.hasClass("box-inline-topic") -> parseRelatedMaterial(element)
+            element.tag == "div" && (element.hasClass("box-note") || element.hasClass("box-small-note")) ->
+                parseInfoBox(element)
             else -> null
         }
     }
@@ -80,8 +91,21 @@ object LentaArticleParser {
     }
 
     private fun parseImage(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.Image? {
-        val url = element.select("img.picture__image").firstOrNull()?.attr("src") ?: ""
+        // Current live markup: figure.picture-box / img.picture-box__image.
+        // Legacy fallback: figure.picture / img.picture__image.
+        val url = element.select("img.picture-box__image").firstOrNull()?.attr("src")
+            ?: element.select("img.picture__image").firstOrNull()?.attr("src")
+            ?: ""
         if (url.isEmpty()) return null
+
+        val newFigcaption = element.select("figcaption.picture-box__description").firstOrNull()
+        if (newFigcaption != null) {
+            val credit = newFigcaption.select(".description-block__credits").firstOrNull()?.text()
+            // New template has an explicit caption paragraph; unlike the legacy shape, don't
+            // fall back to scraping the whole figcaption text when it's missing.
+            val caption = newFigcaption.select(".description-block__caption").firstOrNull()?.text()
+            return ArticleContentType.Image(url = url, caption = caption, credit = credit)
+        }
 
         val figcaption = element.select("figcaption.description").firstOrNull()
         val credit = figcaption?.select(".description__credits")?.firstOrNull()?.text()
@@ -98,39 +122,85 @@ object LentaArticleParser {
     }
 
     private fun parseQuote(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.Quote? {
-        val text = element.select(".box-quote__content-text").firstOrNull()?.text() ?: ""
+        // Legacy shape kept as a first-try fallback; current live markup nests the quote text
+        // (possibly across several <p> tags, flattened via .text()) inside a `.content-body` div
+        // that lives INSIDE this box-quote element — unrelated to the top-level body-container
+        // lookup in parse(), which searches from the whole document instead.
+        val oldText = element.select(".box-quote__content-text").firstOrNull()?.text()
+        val text = if (!oldText.isNullOrEmpty()) {
+            oldText
+        } else {
+            element.select(".content-body").firstOrNull()?.text() ?: ""
+        }
         if (text.isEmpty()) return null
+        // The `.box-quote__author` wrapper may be entirely absent (interview-style quotes with
+        // no attribution); name/description already default to "" / null in that case.
         val authorName = element.select(".box-quote__author-name").firstOrNull()?.text() ?: ""
         val authorDescription = element.select(".box-quote__author-description").firstOrNull()?.text()
         return ArticleContentType.Quote(text = text, authorName = authorName, authorDescription = authorDescription)
     }
 
     private fun parseInfoBox(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.InfoBox? {
-        val text = element.select(".box-note__text").firstOrNull()?.text() ?: ""
+        val text = element.select(".box-note__text").firstOrNull()?.text()
+            ?: element.select(".box-small-note__text").firstOrNull()?.text()
+            ?: ""
         if (text.isEmpty()) return null
         return ArticleContentType.InfoBox(text = text)
     }
 
-    private fun parseRelatedMaterial(element: com.newsrssreader.data.parser.HtmlElement): ArticleContentType.RelatedMaterial? {
-        val card = element.select(".card-inline-topic").firstOrNull() ?: return null
-        val title = card.select(".card-inline-topic__title").firstOrNull()?.text() ?: ""
-        val description = card.select(".card-inline-topic__rightcol").firstOrNull()?.text()
-        val imageUrl = card.select(".card-inline-topic__image").firstOrNull()?.attr("src")
-        var articleUrl = card.attr("href")
-        if (title.isEmpty() || articleUrl.isEmpty()) return null
-        if (!articleUrl.startsWith("http")) {
-            articleUrl = "https://lenta.ru$articleUrl"
+    private fun parseRelatedMaterialList(
+        element: com.newsrssreader.data.parser.HtmlElement,
+    ): List<ArticleContentType.RelatedMaterial> {
+        // Legacy shape: a single `.card-inline-topic` card. Try it first on the whole block.
+        val oldCard = element.select(".card-inline-topic").firstOrNull()
+        if (oldCard != null) {
+            val title = oldCard.select(".card-inline-topic__title").firstOrNull()?.text() ?: ""
+            val description = oldCard.select(".card-inline-topic__rightcol").firstOrNull()?.text()
+            val imageUrl = oldCard.select(".card-inline-topic__image").firstOrNull()?.attr("src")
+            var articleUrl = oldCard.attr("href")
+            if (title.isNotEmpty() && articleUrl.isNotEmpty()) {
+                if (!articleUrl.startsWith("http")) {
+                    articleUrl = "https://lenta.ru$articleUrl"
+                }
+                // NOTE: iOS's RelatedMaterial has no real date-parsing pipeline anywhere (the
+                // field is just raw text with nothing that converts it to a Date), so we leave
+                // date = null here rather than attempting to parse the date text ourselves.
+                return listOf(
+                    ArticleContentType.RelatedMaterial(
+                        title = title,
+                        description = description,
+                        imageUrl = imageUrl,
+                        articleUrl = articleUrl,
+                        date = null,
+                    ),
+                )
+            }
         }
-        // NOTE: iOS's RelatedMaterial has no real date-parsing pipeline anywhere (the field is
-        // just raw text with nothing that converts it to a Date), so we leave date = null here
-        // rather than attempting to parse card-inline-topic__date ourselves.
-        return ArticleContentType.RelatedMaterial(
-            title = title,
-            description = description,
-            imageUrl = imageUrl,
-            articleUrl = articleUrl,
-            date = null,
-        )
+
+        // Current live markup: a carousel of zero-or-more `.box-inline-topic__item`s.
+        val items = element.select(".box-inline-topic__item")
+        val result = mutableListOf<ArticleContentType.RelatedMaterial>()
+        for (item in items) {
+            val title = item.select(".box-inline-topic__title").firstOrNull()?.text() ?: ""
+            val description = item.select(".box-inline-topic__rightcol").firstOrNull()?.text()
+            val imageUrl = item.select(".box-inline-topic__image").firstOrNull()?.attr("src")
+            var articleUrl = item.select(".box-inline-topic__link").firstOrNull()?.attr("href")
+                ?: item.attr("href")
+            if (title.isEmpty() || articleUrl.isEmpty()) continue
+            if (!articleUrl.startsWith("http")) {
+                articleUrl = "https://lenta.ru$articleUrl"
+            }
+            result.add(
+                ArticleContentType.RelatedMaterial(
+                    title = title,
+                    description = description,
+                    imageUrl = imageUrl,
+                    articleUrl = articleUrl,
+                    date = null,
+                ),
+            )
+        }
+        return result
     }
 
     private fun parseJsonLd(doc: com.newsrssreader.data.parser.HtmlDocument): List<ArticleContentType> {
