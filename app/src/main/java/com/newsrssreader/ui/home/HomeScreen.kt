@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsItemCache
@@ -25,6 +26,10 @@ import com.newsrssreader.ui.components.NewsTabs
 import com.newsrssreader.ui.components.NewsTop
 import com.newsrssreader.ui.components.TopPanel
 import kotlinx.coroutines.launch
+
+// Slightly taller than the shared default (used by CategoryScreen) — the home screen's top bar
+// is the app's primary "brand" header, so it gets a bit more visual weight.
+private val HomeTopPanelHeight = 44.dp
 
 /**
  * Home feed screen: hero banner + top7/last24/all tabs + the selected feed's list, matching the
@@ -55,6 +60,7 @@ fun HomeScreen(
         TopPanel(
             onMenuClick = onMenuClick,
             onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+            contentHeight = HomeTopPanelHeight,
         )
 
         LazyColumn(

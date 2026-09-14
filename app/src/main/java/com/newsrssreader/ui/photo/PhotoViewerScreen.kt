@@ -157,6 +157,7 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Black,
                 ),
+                expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight * 0.7f,
             )
         },
     ) { innerPadding ->

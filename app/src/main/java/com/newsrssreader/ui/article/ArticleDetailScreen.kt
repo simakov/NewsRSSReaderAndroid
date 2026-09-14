@@ -106,6 +106,7 @@ fun ArticleDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppTheme.colors.background),
+                expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight * 0.7f,
             )
         },
     ) { innerPadding ->

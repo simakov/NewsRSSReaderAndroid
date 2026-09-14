@@ -1,10 +1,13 @@
 package com.newsrssreader
 
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedVisibility
@@ -51,7 +54,29 @@ class MainActivity : ComponentActivity() {
         // zero). Calling enableEdgeToEdge() here makes the layout edge-to-edge consistently
         // across all supported versions, so the explicit status bar inset in TopPanel/MenuView
         // has a real, consistent effect everywhere.
-        enableEdgeToEdge()
+        //
+        // Explicit (non-auto) status/navigation bar styles: TopPanel/MenuView always paint
+        // AppColors.background (a fixed dark gray, 0xFF292929) behind the status bar in *both*
+        // light and dark system theme (see Color.kt) — this app's dark-mode palette doesn't
+        // mirror the system light/dark split. enableEdgeToEdge()'s default SystemBarStyle.auto()
+        // instead picks dark-vs-light system-bar icons based on the *system* theme, so in system
+        // light mode it would select dark icons — invisible against the always-dark bar
+        // background. Force light (white) icons unconditionally to match the actual bar color.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
+        // enableEdgeToEdge() only turns on Window.isNavigationBarContrastEnforced when the style
+        // passed in is SystemBarStyle.auto(...) — passing the explicit .dark(...) above (needed to
+        // force white nav-bar icons unconditionally, for the same reason as the status bar) makes
+        // it turn contrast enforcement OFF instead. Most screens have a light background behind
+        // the 3-button nav bar (e.g. the light news list), which would leave those forced-white
+        // icons with nothing to contrast against. Re-enable enforcement explicitly so the system
+        // still draws its own translucent scrim behind the nav bar for contrast — this has no
+        // effect on gesture navigation (only 3-button nav), per Android's documented behavior.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = true
+        }
         setContent {
             NewsRSSReaderTheme {
                 AppRoot()
