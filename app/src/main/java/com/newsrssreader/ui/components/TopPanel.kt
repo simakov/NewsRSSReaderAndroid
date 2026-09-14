@@ -11,16 +11,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.newsrssreader.R
 import com.newsrssreader.ui.theme.AppTheme
+import androidx.compose.foundation.Image
 
 // Bar content height (below the status bar inset), 30% shorter than the original 48.dp row —
 // which was governed by IconButton's forced 48.dp minimum touch target, not its own padding.
@@ -62,13 +66,15 @@ fun TopPanel(
             )
         }
 
-        Text(
-            text = "LENTA.RU",
-            color = AppTheme.colors.white,
+        Image(
+            painter = painterResource(id = R.drawable.ic_lenta_logo),
+            contentDescription = "LENTA.RU",
+            contentScale = ContentScale.Fit,
             modifier = Modifier
                 .clickable(onClick = onLogoClick)
                 .padding(TopPanelIconPadding)
-                .size(width = 120.dp, height = contentHeight - TopPanelIconPadding * 2),
+                .height(contentHeight - TopPanelIconPadding * 2)
+                .wrapContentWidth(),
         )
 
         Spacer(modifier = Modifier.weight(1f))

@@ -9,16 +9,15 @@
       OS auto-deriving one from the adaptive launcher icon (inconsistent pre-12, and varies by
       launcher).
 
-      The icon drawable reused here (@drawable/ic_launcher_foreground) is the same asset used as
-      the adaptive icon's foreground layer: a black 108x108dp square with the white Lenta "L"
-      glyph inset well within the adaptive-icon safe zone. Because its background pixels are
-      already solid black - matching windowSplashScreenBackground below - reusing it directly
-      as the splash icon blends seamlessly with no visible seam or extra masking needed, even
-      though the Splash Screen API does not apply adaptive-icon masking to this drawable.
+      The icon drawable used here (@drawable/ic_lenta_logo_splash) is the white "LENTA.RU"
+      wordmark centered on a padded, transparent square canvas (see that drawable's own comment)
+      so the Splash Screen API's forced square-plus-circle-mask icon slot doesn't stretch or crop
+      it - it renders small but fully intact and proportional, blending onto the solid black
+      windowSplashScreenBackground below.
     -->
     <style name="Theme.NewsRSSReader.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#000000</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_lenta_logo_splash</item>
         <item name="postSplashScreenTheme">@style/Theme.NewsRSSReader</item>
     </style>
 </resources>
