@@ -4,42 +4,30 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import coil.compose.AsyncImagePainter
 import com.newsrssreader.data.model.NewsItem
 import com.newsrssreader.ui.theme.AppTheme
 
 private val ThumbnailSize = 60.dp
 private val ThumbnailShape = RoundedCornerShape(4.dp)
 
-// Bounds on the thumbnail's computed height so a pathologically tall/thin or wide/flat image
-// can't blow up (or collapse) the row; genuine variation within this range is allowed through.
-private val ThumbnailMinHeight = 40.dp
-private val ThumbnailMaxHeight = 120.dp
-
 /**
  * A single row in the news list: title + date on the left, a thumbnail (or a plain dark
- * placeholder box when the item has no image) on the right. The thumbnail is always
- * [ThumbnailSize] (60dp) wide; its height adapts to the loaded image's aspect ratio (clamped to
- * [ThumbnailMinHeight]..[ThumbnailMaxHeight]) instead of being forced into a fixed square.
+ * placeholder box when the item has no image) on the right. The thumbnail is always a fixed
+ * [ThumbnailSize] (60dp) square, matching iOS's `.frame(width: 60, height: 60)` with
+ * `.aspectRatio(contentMode: .fill)` — the image is scaled (preserving its own aspect ratio) to
+ * completely cover the square, cropping any excess (Compose's [ContentScale.Crop]).
  */
 @Composable
 fun NewsRow(item: NewsItem, modifier: Modifier = Modifier) {
@@ -64,27 +52,12 @@ fun NewsRow(item: NewsItem, modifier: Modifier = Modifier) {
         }
 
         if (item.image != null) {
-            // Unknown until the image finishes loading; use the fixed square size as a
-            // reasonable default in the meantime so the row doesn't start at a jarring size.
-            var thumbnailHeight by remember(item.image) { mutableStateOf(ThumbnailSize) }
-
             AsyncImage(
                 model = item.image,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                onState = { state ->
-                    if (state is AsyncImagePainter.State.Success) {
-                        val size = state.painter.intrinsicSize
-                        if (size.isSpecified && size.height > 0f) {
-                            val aspectRatio = size.width / size.height
-                            thumbnailHeight = (ThumbnailSize / aspectRatio)
-                                .coerceIn(ThumbnailMinHeight, ThumbnailMaxHeight)
-                        }
-                    }
-                },
                 modifier = Modifier
-                    .width(ThumbnailSize)
-                    .height(thumbnailHeight)
+                    .size(ThumbnailSize)
                     .clip(ThumbnailShape),
             )
         } else {
