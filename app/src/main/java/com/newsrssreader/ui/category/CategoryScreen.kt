@@ -1,5 +1,6 @@
 package com.newsrssreader.ui.category
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,7 +47,11 @@ fun CategoryScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppTheme.colors.blackInversed),
+    ) {
         TopPanel(
             onMenuClick = onMenuClick,
             onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },

@@ -1,5 +1,6 @@
 package com.newsrssreader.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,6 +26,7 @@ import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.NewsTabs
 import com.newsrssreader.ui.components.NewsTop
 import com.newsrssreader.ui.components.TopPanel
+import com.newsrssreader.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
 // Slightly taller than the shared default (used by CategoryScreen) — the home screen's top bar
@@ -56,7 +58,11 @@ fun HomeScreen(
         listState.scrollToItem(0)
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppTheme.colors.blackInversed),
+    ) {
         TopPanel(
             onMenuClick = onMenuClick,
             onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
