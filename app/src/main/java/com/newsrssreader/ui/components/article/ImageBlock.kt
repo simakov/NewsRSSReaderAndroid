@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.newsrssreader.data.model.ArticleContentType
+import com.newsrssreader.ui.components.pinchZoomPreview
 import com.newsrssreader.ui.theme.AppTheme
 
 /**
@@ -38,7 +39,8 @@ fun ImageBlock(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(AppTheme.colors.gray.copy(alpha = 0.2f))
-                .clickable { onImageClick(block.url) },
+                .clickable { onImageClick(block.url) }
+                .pinchZoomPreview(),
         )
 
         if (block.caption != null || block.credit != null) {

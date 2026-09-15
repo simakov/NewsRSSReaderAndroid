@@ -51,6 +51,7 @@ import com.newsrssreader.ui.components.article.InfoBoxBlock
 import com.newsrssreader.ui.components.article.ParagraphBlock
 import com.newsrssreader.ui.components.article.QuoteBlock
 import com.newsrssreader.ui.components.article.SubheadingBlock
+import com.newsrssreader.ui.components.pinchZoomPreview
 import com.newsrssreader.ui.components.shimmer
 import com.newsrssreader.ui.theme.AppTheme
 
@@ -154,7 +155,8 @@ fun ArticleDetailScreen(
                         .aspectRatio(aspectRatio)
                         .background(AppTheme.colors.gray.copy(alpha = 0.2f))
                         .padding(bottom = 16.dp)
-                        .clickable { onImageClick(newsItem.image) },
+                        .clickable { onImageClick(newsItem.image) }
+                        .pinchZoomPreview(),
                 )
             }
 
