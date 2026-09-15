@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.newsrssreader.data.model.ArticleContentType
@@ -33,7 +34,6 @@ fun AuthorBlock(block: ArticleContentType.Author, modifier: Modifier = Modifier)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(AppTheme.colors.lightGrey.copy(alpha = 0.2f))
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -42,6 +42,7 @@ fun AuthorBlock(block: ArticleContentType.Author, modifier: Modifier = Modifier)
             AsyncImage(
                 model = block.photo,
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(AuthorPhotoSize)
                     .clip(CircleShape),

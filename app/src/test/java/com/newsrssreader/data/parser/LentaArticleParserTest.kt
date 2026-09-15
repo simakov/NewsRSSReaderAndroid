@@ -270,6 +270,27 @@ class LentaArticleParserTest {
     }
 
     @Test
+    fun `parses announce from topic-body title-yandex div`() {
+        val html = fixture("article_sample.html")
+        val content = LentaArticleParser.parse(html, sampleNewsItem())
+
+        assertEquals("Краткий анонс статьи в одну строку", content.announce)
+    }
+
+    @Test
+    fun `falls back to news item summary when title-yandex div is missing`() {
+        val html = """
+            <div class="content-body">
+              <p>Текст статьи.</p>
+            </div>
+        """.trimIndent()
+        val newsItem = sampleNewsItem().copy(summary = "Анонс из RSS description")
+        val content = LentaArticleParser.parse(html, newsItem)
+
+        assertEquals("Анонс из RSS description", content.announce)
+    }
+
+    @Test
     fun `title image and published date always come from news item, not html`() {
         val html = fixture("article_sample.html")
         val newsItem = sampleNewsItem()

@@ -31,6 +31,16 @@ data class NewsItem(
         return SimpleDateFormat(pattern, Locale.getDefault()).format(published)
     }
 
+    // Used by the article detail header, which always shows a bare "HH:mm" time (never the
+    // numeric "d.MM" form publishedDate() falls back to for older items) followed by a
+    // Russian-language long date, e.g. "14:32, 15 сентября 2026".
+    fun publishedTimeAndRuDate(): String {
+        val published = this.published ?: return ""
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(published)
+        val ruDate = SimpleDateFormat("d MMMM yyyy", Locale("ru")).format(published)
+        return "$time, $ruDate"
+    }
+
     companion object {
         val sample = NewsItem(
             id = "sample",

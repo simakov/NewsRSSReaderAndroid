@@ -10,7 +10,8 @@ import org.json.JSONObject
  *
  * Ported from the iOS `LentaArticleParser.swift` (NewsRSSReaderShared). Metadata such as title,
  * image, and published date always come from the RSS-derived [NewsItem], never from the HTML —
- * the only thing actually parsed out of the page itself is the category and the body content.
+ * what's actually parsed out of the page itself is the category, a short announce line, and the
+ * body content.
  */
 object LentaArticleParser {
 
@@ -22,6 +23,14 @@ object LentaArticleParser {
         // being a timestamp link), distinguished by an href starting with "/rubrics/".
         val category = doc.select(".topic-header__rubric").firstOrNull()?.text()
             ?: doc.select("a.common-head__info-text[href^=/rubrics/]").firstOrNull()?.text()
+
+        // Live markup carries a short one-line summary right after the <h1> and before the
+        // author block, in a div only otherwise used to feed Yandex/Dzen previews
+        // (`.topic-body__title-yandex`) — this is the gray "announce" line shown on the article
+        // screen. Fall back to the RSS-derived summary (NewsItem.summary, from <description>)
+        // for any page where that div is missing, e.g. if Lenta's markup drifts further.
+        val announce = doc.select(".topic-body__title-yandex").firstOrNull()?.text()?.ifEmpty { null }
+            ?: newsItem.summary
 
         val content = mutableListOf<ArticleContentType>()
 
@@ -55,6 +64,7 @@ object LentaArticleParser {
             image = newsItem.image,
             publishedDate = newsItem.published,
             category = category,
+            announce = announce,
             content = content,
         )
     }

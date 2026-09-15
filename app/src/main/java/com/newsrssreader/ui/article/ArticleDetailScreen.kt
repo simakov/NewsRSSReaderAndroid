@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -73,6 +75,7 @@ fun ArticleDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val topBarBorderColor = AppTheme.colors.topBarBorder
 
     Scaffold(
         modifier = modifier,
@@ -108,6 +111,14 @@ fun ArticleDetailScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppTheme.colors.background),
                 expandedHeight = TopAppBarDefaults.TopAppBarExpandedHeight * 0.7f,
+                modifier = Modifier.drawBehind {
+                    drawLine(
+                        color = topBarBorderColor,
+                        start = Offset(0f, size.height),
+                        end = Offset(size.width, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                },
             )
         },
     ) { innerPadding ->
@@ -118,19 +129,46 @@ fun ArticleDetailScreen(
                 .verticalScroll(rememberScrollState())
                 .background(AppTheme.colors.blackInversed),
         ) {
+            // Time + Russian long-form date, then section (from the HTML-parsed rubric, falling
+            // back to the RSS-derived category from the previous screen), e.g.
+            // "14:32, 15 сентября 2026 · Бывший СССР".
+            val section = uiState.content?.category ?: newsItem.categories?.firstOrNull()
+            val metaLine = listOfNotNull(
+                newsItem.publishedTimeAndRuDate().ifEmpty { null },
+                section?.ifEmpty { null },
+            ).joinToString(" · ")
+            if (metaLine.isNotEmpty()) {
+                Text(
+                    text = metaLine,
+                    style = AppTheme.type.meta,
+                    color = AppTheme.colors.mutedGray,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp, bottom = 4.dp),
+                )
+            }
+
             Text(
                 text = newsItem.title.orEmpty(),
                 style = AppTheme.type.articleTitle,
                 color = AppTheme.colors.black,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
             )
 
-            Text(
-                text = newsItem.publishedDate(),
-                style = AppTheme.type.meta,
-                color = AppTheme.colors.gray,
-                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            )
+            val announce = uiState.content?.announce
+            if (!announce.isNullOrEmpty()) {
+                Text(
+                    text = announce,
+                    style = AppTheme.type.bodyParagraph,
+                    color = AppTheme.colors.mutedGray,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                )
+            }
+
+            // Author is rendered here, ahead of the hero image, rather than inline at its
+            // natural position in the parsed content list (skipped below to avoid a duplicate).
+            val author = uiState.content?.content?.filterIsInstance<ArticleContentType.Author>()?.firstOrNull()
+            if (author != null) {
+                AuthorBlock(author, modifier = Modifier.padding(bottom = 16.dp))
+            }
 
             if (newsItem.image != null) {
                 // Unknown until the image finishes loading; a 16:9 default matches typical
@@ -153,7 +191,7 @@ fun ArticleDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(aspectRatio)
-                        .background(AppTheme.colors.gray.copy(alpha = 0.2f))
+                        .clip(RoundedCornerShape(12.dp))
                         .padding(bottom = 16.dp)
                         .clickable { onImageClick(newsItem.image) }
                         .pinchZoomPreview(),
@@ -164,7 +202,9 @@ fun ArticleDetailScreen(
                 uiState.isLoading -> ArticleLoadingBody()
                 uiState.error != null -> ArticleErrorBody(message = uiState.error.orEmpty())
                 else -> uiState.content?.content?.forEach { block ->
-                    ArticleContentBlock(block, onImageClick)
+                    if (block !is ArticleContentType.Author) {
+                        ArticleContentBlock(block, onImageClick)
+                    }
                 }
             }
         }

@@ -23,5 +23,6 @@ data class ArticleContent(
     val image: String? = null,
     val publishedDate: Date? = null,
     val category: String? = null,
+    val announce: String? = null,
     val content: List<ArticleContentType>,
 )
