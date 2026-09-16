@@ -4,6 +4,23 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Computed once at configuration time: the most recent reachable git tag, used to populate
+// BuildConfig.GIT_TAG so a running app can compare itself against GitHub Releases' tag_name.
+// Falls back to "v0.0.0" in a checkout with no tags yet (e.g. a fresh clone before the first
+// release), so the build never fails just because no release has happened.
+val gitTag: String = run {
+    val process = ProcessBuilder("git", "describe", "--tags", "--abbrev=0")
+        .directory(rootDir)
+        .start()
+    process.waitFor()
+    val output = if (process.exitValue() == 0) {
+        process.inputStream.bufferedReader().readText().trim()
+    } else {
+        ""
+    }
+    output.ifBlank { "v0.0.0" }
+}
+
 android {
     namespace = "com.newsrssreader"
     compileSdk = 35
@@ -15,6 +32,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GIT_TAG", "\"$gitTag\"")
     }
 
     buildTypes {
@@ -31,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests {
