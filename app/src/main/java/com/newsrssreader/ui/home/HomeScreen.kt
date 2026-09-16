@@ -11,7 +11,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ private val HomeTopPanelHeight = 44.dp
  * `TopPanel` is a fixed header above the scroll area; the hero banner, the tabs, and the list all
  * scroll together as one `LazyColumn` so the hero/tabs aren't pinned above the list.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
@@ -69,41 +72,48 @@ fun HomeScreen(
             contentHeight = HomeTopPanelHeight,
         )
 
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = WindowInsets.navigationBars.asPaddingValues(),
         ) {
-            item {
-                NewsTop(
-                    item = uiState.firstNews,
-                    onClick = {
-                        uiState.firstNews?.let {
-                            NewsItemCache.put(it)
-                            onArticleClick(it.id)
-                        }
-                    },
-                )
-            }
-            item {
-                NewsTabs(selectedTab = uiState.tab, onTabSelected = viewModel::changeTab)
-            }
-
-            if (uiState.isLoading) {
-                items(7) {
-                    NewsRowPlaceholder()
-                }
-            } else {
-                itemsIndexed(uiState.rssFeed, key = { _, item -> item.id }) { index, item ->
-                    NewsRow(
-                        item = item,
-                        modifier = Modifier.clickable {
-                            NewsItemCache.put(item)
-                            onArticleClick(item.id)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+            ) {
+                item {
+                    NewsTop(
+                        item = uiState.firstNews,
+                        onClick = {
+                            uiState.firstNews?.let {
+                                NewsItemCache.put(it)
+                                onArticleClick(it.id)
+                            }
                         },
                     )
-                    if (index != uiState.rssFeed.lastIndex) {
-                        HorizontalDivider()
+                }
+                item {
+                    NewsTabs(selectedTab = uiState.tab, onTabSelected = viewModel::changeTab)
+                }
+
+                if (uiState.isLoading) {
+                    items(7) {
+                        NewsRowPlaceholder()
+                    }
+                } else {
+                    itemsIndexed(uiState.rssFeed, key = { _, item -> item.id }) { index, item ->
+                        NewsRow(
+                            item = item,
+                            modifier = Modifier.clickable {
+                                NewsItemCache.put(item)
+                                onArticleClick(item.id)
+                            },
+                            isHighlighted = item.id in uiState.newItemIds,
+                        )
+                        if (index != uiState.rssFeed.lastIndex) {
+                            HorizontalDivider()
+                        }
                     }
                 }
             }

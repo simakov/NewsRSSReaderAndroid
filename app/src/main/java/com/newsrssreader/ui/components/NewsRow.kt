@@ -1,5 +1,6 @@
 package com.newsrssreader.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,9 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
@@ -28,11 +31,21 @@ private val ThumbnailShape = RoundedCornerShape(4.dp)
  * [ThumbnailSize] (60dp) square, matching iOS's `.frame(width: 60, height: 60)` with
  * `.aspectRatio(contentMode: .fill)` — the image is scaled (preserving its own aspect ratio) to
  * completely cover the square, cropping any excess (Compose's [ContentScale.Crop]).
+ *
+ * [isHighlighted] tints the row background to flag it as newly arrived from a pull-to-refresh;
+ * the fade itself is animated here, but when the highlight should end (and disappear) is decided
+ * by the caller's ViewModel, not this composable.
  */
 @Composable
-fun NewsRow(item: NewsItem, modifier: Modifier = Modifier) {
+fun NewsRow(item: NewsItem, modifier: Modifier = Modifier, isHighlighted: Boolean = false) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isHighlighted) AppTheme.colors.newsHighlight else Color.Transparent,
+        label = "newsRowHighlight",
+    )
     Row(
-        modifier = modifier.padding(10.dp),
+        modifier = modifier
+            .background(backgroundColor)
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

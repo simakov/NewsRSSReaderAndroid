@@ -23,6 +23,11 @@ data class AppColors(
     // (background == blackInversed), so a pale gray line is needed to keep the bar from
     // blending into the content underneath it.
     val topBarBorder: Color,
+    // Background for news rows that just appeared in a pull-to-refresh. A subtle warm/pale
+    // yellow tint in light mode (the screen background there is plain white), and a slightly
+    // lighter charcoal than the screen background in dark mode (which is otherwise too dark for
+    // a yellow tint to read as anything other than muddy).
+    val newsHighlight: Color,
 )
 
 val LightAppColors = AppColors(
@@ -36,6 +41,7 @@ val LightAppColors = AppColors(
     red = Color(0xFFBB393F),
     mutedGray = Color(0xFF636363),
     topBarBorder = Color.Transparent,
+    newsHighlight = Color(0xFFFFF6D9),
 )
 
 val DarkAppColors = AppColors(
@@ -49,6 +55,7 @@ val DarkAppColors = AppColors(
     red = Color(0xFFBB393F),
     mutedGray = Color(0xFF9E9E9E),
     topBarBorder = Color(0xFF4D4D4D),
+    newsHighlight = Color(0xFF3D3D3D),
 )
 
 val LocalAppColors = staticCompositionLocalOf { LightAppColors }

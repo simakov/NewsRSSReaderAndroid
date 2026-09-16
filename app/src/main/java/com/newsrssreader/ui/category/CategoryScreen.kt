@@ -12,8 +12,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,6 +37,7 @@ import kotlinx.coroutines.launch
  * followed by a title header for the selected category and the same shimmer-while-loading /
  * real-rows-with-dividers list pattern as `HomeScreen`.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(
     categoryKey: String,
@@ -63,26 +66,33 @@ fun CategoryScreen(
             modifier = Modifier.padding(top = 10.dp, start = 10.dp),
         )
 
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = WindowInsets.navigationBars.asPaddingValues(),
         ) {
-            if (uiState.isLoading) {
-                items(7) {
-                    NewsRowPlaceholder()
-                }
-            } else {
-                itemsIndexed(uiState.news, key = { _, item -> item.id }) { index, item ->
-                    NewsRow(
-                        item = item,
-                        modifier = Modifier.clickable {
-                            NewsItemCache.put(item)
-                            onArticleClick(item.id)
-                        },
-                    )
-                    if (index != uiState.news.lastIndex) {
-                        HorizontalDivider()
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+            ) {
+                if (uiState.isLoading) {
+                    items(7) {
+                        NewsRowPlaceholder()
+                    }
+                } else {
+                    itemsIndexed(uiState.news, key = { _, item -> item.id }) { index, item ->
+                        NewsRow(
+                            item = item,
+                            modifier = Modifier.clickable {
+                                NewsItemCache.put(item)
+                                onArticleClick(item.id)
+                            },
+                            isHighlighted = item.id in uiState.newItemIds,
+                        )
+                        if (index != uiState.news.lastIndex) {
+                            HorizontalDivider()
+                        }
                     }
                 }
             }
