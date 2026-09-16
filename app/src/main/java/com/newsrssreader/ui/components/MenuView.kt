@@ -13,20 +13,33 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
 import com.newsrssreader.data.network.LentaFeedService
+import com.newsrssreader.data.network.UpdateRelease
 import com.newsrssreader.ui.theme.AppTheme
+import com.newsrssreader.ui.update.DownloadPhase
+import com.newsrssreader.ui.update.UpdateUiState
 
 /**
  * Static content of the category drawer, matching the iOS `MenuView`. Presentation (slide-in
@@ -38,6 +51,8 @@ fun MenuView(
     selectedCategory: String,
     onCategorySelected: (String) -> Unit,
     onDismiss: () -> Unit,
+    updateState: UpdateUiState = UpdateUiState(),
+    onUpdateClick: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -76,17 +91,29 @@ fun MenuView(
             modifier = Modifier.padding(vertical = 10.dp),
         )
 
-        MenuItem(
-            title = "Главная",
-            selected = selectedCategory == "",
-            onClick = { onCategorySelected("") },
-        )
-        LentaFeedService.categories.forEach { (key, title) ->
+        // weight(1f) + verticalScroll lets this list shrink/scroll instead of pushing the update
+        // banner below off screen on short devices.
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
             MenuItem(
-                title = title,
-                selected = selectedCategory == key,
-                onClick = { onCategorySelected(key) },
+                title = "Главная",
+                selected = selectedCategory == "",
+                onClick = { onCategorySelected("") },
             )
+            LentaFeedService.categories.forEach { (key, title) ->
+                MenuItem(
+                    title = title,
+                    selected = selectedCategory == key,
+                    onClick = { onCategorySelected(key) },
+                )
+            }
+        }
+
+        updateState.release?.let { release ->
+            UpdateBanner(release = release, phase = updateState.phase, onUpdateClick = onUpdateClick)
         }
     }
 }
@@ -111,5 +138,92 @@ private fun MenuItem(title: String, selected: Boolean, onClick: () -> Unit) {
             color = if (selected) AppTheme.colors.red else AppTheme.colors.white,
             modifier = Modifier.padding(start = 12.dp),
         )
+    }
+}
+
+@Composable
+private fun UpdateBanner(release: UpdateRelease, phase: DownloadPhase, onUpdateClick: () -> Unit) {
+    var showNotes by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppTheme.colors.backgroundWhite)
+            .padding(16.dp),
+    ) {
+        Text(
+            text = "Доступно обновление",
+            style = AppTheme.type.menuItemSelected,
+            color = AppTheme.colors.black,
+        )
+
+        Box(modifier = Modifier.padding(top = 6.dp, bottom = 12.dp)) {
+            Text(
+                text = "Что нового",
+                style = AppTheme.type.meta,
+                color = AppTheme.colors.red,
+                modifier = Modifier.clickable { showNotes = !showNotes },
+            )
+            if (showNotes) {
+                Popup(alignment = Alignment.BottomStart, onDismissRequest = { showNotes = false }) {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 260.dp)
+                            .background(AppTheme.colors.black, shape = RoundedCornerShape(8.dp))
+                            .clickable { showNotes = false }
+                            .padding(12.dp),
+                    ) {
+                        Text(
+                            text = release.notes,
+                            style = AppTheme.type.meta,
+                            color = AppTheme.colors.white,
+                        )
+                    }
+                }
+            }
+        }
+
+        // A single slot: either the button or the progress readout, never both at once.
+        when (phase) {
+            is DownloadPhase.Downloading -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    LinearProgressIndicator(
+                        progress = { phase.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = "${(phase.progress * 100).toInt()}%",
+                        style = AppTheme.type.meta,
+                        color = AppTheme.colors.black,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            is DownloadPhase.ReadyToInstall -> {
+                Text(
+                    text = "Готово к установке",
+                    style = AppTheme.type.meta,
+                    color = AppTheme.colors.black,
+                )
+            }
+            is DownloadPhase.Failed -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Не удалось загрузить обновление",
+                        style = AppTheme.type.meta,
+                        color = AppTheme.colors.red,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Button(onClick = onUpdateClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Повторить")
+                    }
+                }
+            }
+            DownloadPhase.Idle -> {
+                Button(onClick = onUpdateClick, modifier = Modifier.fillMaxWidth()) {
+                    Text("Обновить")
+                }
+            }
+        }
     }
 }
