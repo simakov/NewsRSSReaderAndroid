@@ -50,7 +50,19 @@ like breaking changes or small fixes.
    new to release and ask whether they still want an empty release — don't just proceed
    silently, since an empty release is almost never what's wanted.
 
-4. **Build the APK.**
+4. **Create the tag locally (do not push yet).**
+   ```bash
+   git tag -a "<NEXT_VERSION>" -m "<NEXT_VERSION>"
+   ```
+   This must happen **before** building the APK, not after: the app's `build.gradle.kts` bakes
+   `git describe --tags --abbrev=0` into `BuildConfig.GIT_TAG` at build time, which the app
+   compares against GitHub Releases to detect updates. If the APK were built first and tagged
+   second (the old, buggy order), the shipped APK would report the *previous* tag and the app
+   would immediately think a newer version (itself) is available. Tagging locally first —
+   without pushing — makes the build pick up the correct tag while keeping the actual
+   publish-visible action (the push) gated behind the confirmation step below, same as before.
+
+5. **Build the APK.**
    ```bash
    export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # only if not already set
    ./gradlew :app:assembleDebug
@@ -65,17 +77,21 @@ like breaking changes or small fixes.
    multiple releases. Do this before asking for confirmation so the plan shown to the user
    is complete and doesn't stall mid-release on a build failure.
 
-5. **Present the plan and get confirmation before touching anything remote.**
+   If anything goes wrong here (or the user declines in the next step), delete the local tag
+   (`git tag -d "<NEXT_VERSION>"`) before stopping — it was never pushed, so this is a fully
+   clean, invisible-to-everyone-else rollback.
+
+6. **Present the plan and get confirmation before touching anything remote.**
    Show the user: the new tag name, the commit it will point at (`git rev-parse --short
    HEAD`), the generated release notes, and the built APK (path + size). Ask them to confirm
    before pushing the tag or creating the release — tagging and publishing a release are
    visible, hard-to-cleanly-undo actions (deleting a pushed tag/release after the fact is
    possible but messy if anyone already pulled it), so don't skip this even though the rest
-   of the workflow is scripted.
+   of the workflow is scripted. If they decline, delete the local tag (`git tag -d
+   "<NEXT_VERSION>"`) and stop — nothing has touched the remote yet.
 
-6. **On confirmation, tag, release, and attach the APK.**
+7. **On confirmation, push the tag, release, and attach the APK.**
    ```bash
-   git tag -a "<NEXT_VERSION>" -m "<NEXT_VERSION>"
    git push origin "<NEXT_VERSION>"
    gh release create "<NEXT_VERSION>" \
      --title "<NEXT_VERSION>" \
@@ -86,7 +102,7 @@ like breaking changes or small fixes.
    creating a new one, which keeps "tag the commit" and "publish the release" as distinct
    steps.
 
-7. **Report the result.** Share the release URL that `gh release create` prints, the final
+8. **Report the result.** Share the release URL that `gh release create` prints, the final
    version number, and confirm the APK asset is attached (`gh release view <NEXT_VERSION>
    --json assets --jq '.assets[].name'`).
 
