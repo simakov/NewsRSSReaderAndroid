@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import android.graphics.Color
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
@@ -22,6 +23,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -35,8 +39,14 @@ import com.newsrssreader.ui.components.MenuView
 import com.newsrssreader.ui.home.HomeScreen
 import com.newsrssreader.ui.photo.PhotoViewerScreen
 import com.newsrssreader.ui.theme.NewsRSSReaderTheme
+import com.newsrssreader.ui.update.UpdateViewModel
 
 class MainActivity : ComponentActivity() {
+    // Held here (not just inside AppRoot's viewModel()) so onResume can reach it directly to
+    // retry an install that was deferred while the user was sent to the system settings screen
+    // for the "install unknown apps" permission.
+    private val updateViewModel: UpdateViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Must run before super.onCreate() per the AndroidX Splash Screen API's documented usage
         // pattern; it takes over the window installed for the Theme.NewsRSSReader.Splash launch
@@ -79,9 +89,14 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             NewsRSSReaderTheme {
-                AppRoot()
+                AppRoot(updateViewModel = updateViewModel)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateViewModel.retryInstallIfNeeded(this)
     }
 }
 
@@ -94,9 +109,12 @@ class MainActivity : ComponentActivity() {
  * actually on screen.
  */
 @Composable
-fun AppRoot() {
+fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
     val navController = rememberNavController()
     var menuShown by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val updateUiState by updateViewModel.uiState.collectAsStateWithLifecycle()
+    val showUpdateBadge = updateUiState.release != null
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -113,6 +131,7 @@ fun AppRoot() {
                 HomeScreen(
                     onMenuClick = { menuShown = true },
                     onArticleClick = { id -> navController.navigate("article/$id") },
+                    showUpdateBadge = showUpdateBadge,
                 )
             }
             composable(
@@ -124,6 +143,7 @@ fun AppRoot() {
                     categoryKey = key,
                     onMenuClick = { menuShown = true },
                     onArticleClick = { id -> navController.navigate("article/$id") },
+                    showUpdateBadge = showUpdateBadge,
                 )
             }
             composable(
@@ -186,6 +206,8 @@ fun AppRoot() {
                         }
                     }
                 },
+                updateState = updateUiState,
+                onUpdateClick = { updateViewModel.startDownload(context) },
             )
         }
     }
