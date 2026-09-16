@@ -16,3 +16,4 @@ bin/
 gen/
 out/
 /app/build/
+.worktrees/
