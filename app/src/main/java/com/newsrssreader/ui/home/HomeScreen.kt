@@ -49,6 +49,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     onMenuClick: () -> Unit,
     onArticleClick: (String) -> Unit,
+    showUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -70,6 +71,7 @@ fun HomeScreen(
             onMenuClick = onMenuClick,
             onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
             contentHeight = HomeTopPanelHeight,
+            showUpdateBadge = showUpdateBadge,
         )
 
         PullToRefreshBox(

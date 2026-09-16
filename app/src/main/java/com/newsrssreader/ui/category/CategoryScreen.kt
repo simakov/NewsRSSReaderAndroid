@@ -44,6 +44,7 @@ fun CategoryScreen(
     viewModel: CategoryViewModel = viewModel { CategoryViewModel(categoryKey) },
     onMenuClick: () -> Unit,
     onArticleClick: (String) -> Unit,
+    showUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,6 +59,7 @@ fun CategoryScreen(
         TopPanel(
             onMenuClick = onMenuClick,
             onLogoClick = { coroutineScope.launch { listState.animateScrollToItem(0) } },
+            showUpdateBadge = showUpdateBadge,
         )
         Text(
             text = uiState.categoryTitle,
