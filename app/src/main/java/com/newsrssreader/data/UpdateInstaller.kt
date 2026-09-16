@@ -23,6 +23,10 @@ interface UpdateInstaller {
      * (see UpdateViewModel.retryInstallIfNeeded, called from MainActivity.onResume).
      */
     fun requestInstall(context: Context, file: File)
+
+    /** True if this app currently has permission to install packages (i.e. requestInstall
+     * would actually trigger the system installer rather than redirecting to Settings). */
+    fun canInstall(context: Context): Boolean
 }
 
 object AndroidUpdateInstaller : UpdateInstaller {
@@ -73,4 +77,7 @@ object AndroidUpdateInstaller : UpdateInstaller {
         }
         context.startActivity(intent)
     }
+
+    override fun canInstall(context: Context): Boolean =
+        context.packageManager.canRequestPackageInstalls()
 }

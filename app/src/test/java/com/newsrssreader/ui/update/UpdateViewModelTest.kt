@@ -53,6 +53,7 @@ class UpdateViewModelTest {
         var installRequested = false
         var installRequestCount = 0
         var downloadCallCount = 0
+        var canInstallResult = true
         val progressUpdates = mutableListOf<Float>()
 
         override suspend fun download(context: Context, url: String, onProgress: (Float) -> Unit): File {
@@ -67,6 +68,8 @@ class UpdateViewModelTest {
             installRequested = true
             installRequestCount++
         }
+
+        override fun canInstall(context: Context) = canInstallResult
     }
 
     /**
@@ -85,6 +88,8 @@ class UpdateViewModelTest {
         }
 
         override fun requestInstall(context: Context, file: File) = Unit
+
+        override fun canInstall(context: Context) = true
     }
 
     private class IOExceptionForTest : Exception("boom")
@@ -195,6 +200,31 @@ class UpdateViewModelTest {
         // requests install again.
         viewModel.retryInstallIfNeeded(context)
         assertEquals(2, installer.installRequestCount)
+    }
+
+    @Test
+    fun `retryInstallIfNeeded does not call requestInstall when the install permission still isn't granted`() = runTest {
+        val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
+        val installer = FakeInstaller()
+        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        dispatcher.scheduler.advanceUntilIdle()
+        val context = RuntimeEnvironment.getApplication()
+
+        viewModel.startDownload(context)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.phase is DownloadPhase.ReadyToInstall)
+
+        // startDownload's own success path already requested install once, via canInstall==true.
+        assertEquals(1, installer.installRequestCount)
+        installer.installRequested = false
+
+        // Simulate the user backing out of the Settings screen without granting the permission:
+        // a subsequent passive onResume-triggered retry must not blindly re-open Settings.
+        installer.canInstallResult = false
+        viewModel.retryInstallIfNeeded(context)
+
+        assertFalse(installer.installRequested)
+        assertEquals(1, installer.installRequestCount)
     }
 
     @Test

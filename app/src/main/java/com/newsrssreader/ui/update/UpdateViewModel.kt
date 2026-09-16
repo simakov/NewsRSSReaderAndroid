@@ -74,10 +74,13 @@ class UpdateViewModel(
     }
 
     /** Called from MainActivity.onResume(): if a download finished but install was deferred
-     * (user was sent to the "install unknown apps" settings screen), retry now that they're back. */
+     * (user was sent to the "install unknown apps" settings screen), retry now that they're back.
+     * Only actually retries once the install permission has genuinely been granted — otherwise
+     * every passive app resume (switching apps and back, pulling down notifications, etc.) would
+     * blindly re-trigger the Settings redirect again. */
     fun retryInstallIfNeeded(context: Context) {
         val phase = _uiState.value.phase
-        if (phase is DownloadPhase.ReadyToInstall) {
+        if (phase is DownloadPhase.ReadyToInstall && installer.canInstall(context)) {
             installer.requestInstall(context, phase.file)
         }
     }
