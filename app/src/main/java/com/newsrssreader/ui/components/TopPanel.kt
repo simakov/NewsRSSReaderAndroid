@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -43,6 +44,7 @@ fun TopPanel(
     onLogoClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     contentHeight: Dp = TopPanelDefaultContentHeight,
+    showUpdateBadge: Boolean = false,
 ) {
     Row(
         // Inset below the status bar first, then let CenterVertically center the icon/text within
@@ -64,6 +66,14 @@ fun TopPanel(
                 contentDescription = "Menu",
                 tint = AppTheme.colors.white,
             )
+            if (showUpdateBadge) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(8.dp)
+                        .background(AppTheme.colors.red, shape = CircleShape),
+                )
+            }
         }
 
         Image(
