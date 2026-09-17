@@ -37,9 +37,13 @@ acceptable since it never ships in the app.
 # First-time setup: point Gradle at your local Android SDK
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 
-# Build a debug APK
+# Build a debug APK (day-to-day development)
 ./gradlew :app:assembleDebug
 # Output: app/build/outputs/apk/debug/app-debug.apk
+
+# Build the signed, minified APK that ships to users
+./gradlew :app:assembleRelease
+# Output: app/build/outputs/apk/release/app-release.apk
 
 # Run unit tests
 ./gradlew test
@@ -56,6 +60,35 @@ If `JAVA_HOME` isn't already set to a JDK 17+ install, export it before running 
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 ```
+
+### Release signing
+
+The `release` build type is signed with a project-specific key. Neither the keystore nor its
+passwords live in the repository — `app/build.gradle.kts` reads four Gradle properties
+(`NEWSRSSREADER_RELEASE_STORE_FILE`, `_STORE_PASSWORD`, `_KEY_ALIAS`, `_KEY_PASSWORD`) that are
+kept in `~/.gradle/gradle.properties`, with the keystore itself at
+`~/.android/newsrssreader-release.jks`.
+
+When those properties are absent — a fresh clone, another machine, CI — the release build does
+**not** fail; it falls back to producing `app-release-unsigned.apk`, which cannot be installed.
+So always confirm what you actually built before handing it to anyone:
+
+```bash
+$ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs \
+  app/build/outputs/apk/release/app-release.apk   # must print CN=NewsRSSReader
+```
+
+Two consequences worth knowing:
+- **The keystore is unbackuppable-by-default and irreplaceable.** Android will not install an
+  update over an app signed with a different key, so losing `newsrssreader-release.jks` means no
+  future build can ever update an existing install — only a manual uninstall/reinstall. Back up
+  the keystore and `~/.gradle/gradle.properties` together.
+- **Releases `v1.0.0`–`v1.2.0` were signed with the Android debug key**, not this one. Anyone
+  still running one of those has to uninstall before a `v1.3.0`-or-later APK will install; the
+  in-app updater cannot do that for them.
+
+`build_apk.sh` deliberately still builds the *debug* APK — it is a local development
+convenience (it drops the result in `~/Downloads`), not the release path.
 
 No Android Studio project generation step is needed — this is a standard Gradle project
 (`settings.gradle.kts` + `app/build.gradle.kts` + a Gradle version catalog at

@@ -1,13 +1,13 @@
 ---
 name: release
-description: Cuts a new GitHub release for this repo — bumps MINOR version (+1, patch reset to 0) from the latest vX.Y.Z tag, tags the current HEAD commit, builds a debug APK, and publishes a GitHub release with that APK attached and release notes rewritten as a plain-language, user-facing announcement (not a raw commit changelog) from every commit since the previous release. Use whenever the user asks to "release", "cut a release", "release a new version", "запусти релиз", "сделай релиз", "затегай версию", "подними версию и релизни", or otherwise wants a version tag + GitHub release (with APK) created from the current commit.
+description: Cuts a new GitHub release for this repo — bumps MINOR version (+1, patch reset to 0) from the latest vX.Y.Z tag, tags the current HEAD commit, builds a signed, minified release APK, and publishes a GitHub release with that APK attached and release notes rewritten as a plain-language, user-facing announcement (not a raw commit changelog) from every commit since the previous release. Use whenever the user asks to "release", "cut a release", "release a new version", "запусти релиз", "сделай релиз", "затегай версию", "подними версию и релизни", or otherwise wants a version tag + GitHub release (with APK) created from the current commit.
 ---
 
 # Release
 
 Cuts a new release of this Android app: computes the next version, tags the current
 commit, publishes a GitHub release with a plain-language announcement rewritten from the
-raw commit history (not a raw changelog), and attaches a built debug APK as a release asset.
+raw commit history (not a raw changelog), and attaches a signed release APK as a release asset.
 
 ## Versioning rule
 
@@ -107,17 +107,40 @@ like breaking changes or small fixes.
 6. **Build the APK.**
    ```bash
    export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # only if not already set
-   ./gradlew :app:assembleDebug
+   ./gradlew :app:assembleRelease
    ```
-   Use the **debug** build, not release: `app/build.gradle.kts` has no `signingConfig` on
-   the `release` build type, so `assembleRelease` produces an unsigned APK that can't be
-   installed — the debug build is signed with the debug key and is what this project's own
-   `build_apk.sh` / CLAUDE.md already use for distributable local builds. Copy the output
-   (`app/build/outputs/apk/debug/app-debug.apk`) to the scratchpad directory, renamed to
-   include the version, e.g. `NewsRSSReader-<NEXT_VERSION>.apk`, since `gh release upload`
-   uses the filename as the asset name and `app-debug.apk` on its own isn't useful across
-   multiple releases. Do this before asking for confirmation so the plan shown to the user
-   is complete and doesn't stall mid-release on a build failure.
+   Use the **release** build. It is minified by R8 and signed with the project's release key,
+   which `app/build.gradle.kts` reads from Gradle properties kept outside the repository
+   (`NEWSRSSREADER_RELEASE_STORE_FILE` and friends, normally in `~/.gradle/gradle.properties`).
+   The release build is roughly 1.3 MB against the debug build's ~18 MB, and janks about half
+   as much on the same hardware, so it is what users should actually be given.
+
+   **Verify the APK is really signed before going any further:**
+   ```bash
+   "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs \
+     app/build/outputs/apk/release/app-release.apk
+   ```
+   It must print `CN=NewsRSSReader`. Two failure modes to watch for, both of which produce a
+   build that *succeeds* rather than erroring:
+   - The signing properties are missing (a fresh clone, a different machine, CI). The build
+     then falls back to unsigned and emits `app-release-unsigned.apk` instead. An unsigned APK
+     cannot be installed, so **stop** and tell the user the release key is not configured on
+     this machine rather than publishing an uninstallable asset.
+   - The certificate prints `CN=Android Debug`. That means the debug key is being used; stop
+     and fix the configuration.
+
+   Copy the output (`app/build/outputs/apk/release/app-release.apk`) to the scratchpad
+   directory, renamed to include the version, e.g. `NewsRSSReader-<NEXT_VERSION>.apk`, since
+   `gh release upload` uses the filename as the asset name and `app-release.apk` on its own
+   isn't useful across multiple releases. Do this before asking for confirmation so the plan
+   shown to the user is complete and doesn't stall mid-release on a build failure.
+
+   **Signing key changes break updates in place.** Android refuses to install an APK over an
+   installed copy signed with a different key. Releases `v1.0.0`–`v1.2.0` were signed with the
+   debug key; everything from `v1.3.0` on uses the release key, so anyone still on one of those
+   older builds has to uninstall before the new one will install, and the app's own updater
+   cannot do it for them. If the signing key ever changes again, say so plainly in the release
+   announcement — it is a user-visible consequence, not an implementation detail.
 
    If anything goes wrong here (or the user declines in the next step), delete the local tag
    (`git tag -d "<NEXT_VERSION>"`) before stopping — it was never pushed, so this is a fully

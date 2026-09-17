@@ -22,9 +22,29 @@ val gitTag: String = run {
     output.ifBlank { "v0.0.0" }
 }
 
+// Release signing is configured from Gradle properties kept outside the repository (normally
+// ~/.gradle/gradle.properties), so no key material or password is ever committed. When they are
+// absent — a fresh clone, or a CI runner — the release build still assembles, just unsigned,
+// rather than failing outright; `signingConfigs.findByName("release")` below then resolves to
+// null, which is exactly what the release build type had before signing existed at all.
+val releaseStoreFile = (project.findProperty("NEWSRSSREADER_RELEASE_STORE_FILE") as String?)
+    ?.let { File(it) }
+    ?.takeIf { it.exists() }
+
 android {
     namespace = "com.newsrssreader"
     compileSdk = 35
+
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = project.findProperty("NEWSRSSREADER_RELEASE_STORE_PASSWORD") as String?
+                keyAlias = project.findProperty("NEWSRSSREADER_RELEASE_KEY_ALIAS") as String?
+                keyPassword = project.findProperty("NEWSRSSREADER_RELEASE_KEY_PASSWORD") as String?
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.newsrssreader"
@@ -38,6 +58,7 @@ android {
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
