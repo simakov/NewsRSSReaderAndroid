@@ -56,9 +56,21 @@ fun HomeScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Every field of the ui state is read here, in the screen's own recomposition scope, and the
+    // lazy item lambdas below capture the resulting plain values. Reading `uiState` *inside* an
+    // item lambda instead would subscribe each visible row directly to the state snapshot, so any
+    // unrelated change to it (the refresh flag toggling, the new-item highlight expiring after its
+    // 30s window) would invalidate every visible row rather than letting the unaffected ones skip.
+    val tab = uiState.tab
+    val firstNews = uiState.firstNews
+    val feed = uiState.rssFeed
+    val newItemIds = uiState.newItemIds
+    val isLoading = uiState.isLoading
+    val isRefreshing = uiState.isRefreshing
+
     // Reset scroll to the top whenever the selected tab changes (also fires harmlessly on
     // initial composition, when the list is already at position 0).
-    LaunchedEffect(uiState.tab) {
+    LaunchedEffect(tab) {
         listState.scrollToItem(0)
     }
 
@@ -75,7 +87,7 @@ fun HomeScreen(
         )
 
         PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
+            isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -86,9 +98,9 @@ fun HomeScreen(
             ) {
                 item {
                     NewsTop(
-                        item = uiState.firstNews,
+                        item = firstNews,
                         onClick = {
-                            uiState.firstNews?.let {
+                            firstNews?.let {
                                 NewsItemCache.put(it)
                                 onArticleClick(it.id)
                             }
@@ -96,26 +108,29 @@ fun HomeScreen(
                     )
                 }
                 item {
-                    NewsTabs(selectedTab = uiState.tab, onTabSelected = viewModel::changeTab)
+                    NewsTabs(selectedTab = tab, onTabSelected = viewModel::changeTab)
                 }
 
-                if (uiState.isLoading) {
+                if (isLoading) {
                     items(7) {
                         NewsRowPlaceholder()
                     }
                 } else {
-                    itemsIndexed(uiState.rssFeed, key = { _, item -> item.id }) { index, item ->
+                    // A leading divider skipped for the first row, rather than a trailing one
+                    // guarded by `index != feed.lastIndex`: it puts a divider between exactly the
+                    // same pairs of rows, but without the item lambda having to read the list.
+                    itemsIndexed(feed, key = { _, item -> item.id }) { index, item ->
+                        if (index > 0) {
+                            HorizontalDivider()
+                        }
                         NewsRow(
                             item = item,
                             modifier = Modifier.clickable {
                                 NewsItemCache.put(item)
                                 onArticleClick(item.id)
                             },
-                            isHighlighted = item.id in uiState.newItemIds,
+                            isHighlighted = item.id in newItemIds,
                         )
-                        if (index != uiState.rssFeed.lastIndex) {
-                            HorizontalDivider()
-                        }
                     }
                 }
             }

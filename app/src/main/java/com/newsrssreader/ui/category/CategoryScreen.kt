@@ -51,6 +51,15 @@ fun CategoryScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    // Read here, in the screen's own recomposition scope, so the lazy item lambdas below capture
+    // plain values instead of subscribing each visible row to the whole state snapshot. See the
+    // matching comment in HomeScreen.
+    val categoryTitle = uiState.categoryTitle
+    val news = uiState.news
+    val newItemIds = uiState.newItemIds
+    val isLoading = uiState.isLoading
+    val isRefreshing = uiState.isRefreshing
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -62,14 +71,14 @@ fun CategoryScreen(
             showUpdateBadge = showUpdateBadge,
         )
         Text(
-            text = uiState.categoryTitle,
+            text = categoryTitle,
             style = AppTheme.type.categoryHeader,
             color = AppTheme.colors.black,
             modifier = Modifier.padding(top = 10.dp, start = 10.dp),
         )
 
         PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
+            isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -78,23 +87,24 @@ fun CategoryScreen(
                 state = listState,
                 contentPadding = WindowInsets.navigationBars.asPaddingValues(),
             ) {
-                if (uiState.isLoading) {
+                if (isLoading) {
                     items(7) {
                         NewsRowPlaceholder()
                     }
                 } else {
-                    itemsIndexed(uiState.news, key = { _, item -> item.id }) { index, item ->
+                    // Leading divider skipped for the first row — see the note in HomeScreen.
+                    itemsIndexed(news, key = { _, item -> item.id }) { index, item ->
+                        if (index > 0) {
+                            HorizontalDivider()
+                        }
                         NewsRow(
                             item = item,
                             modifier = Modifier.clickable {
                                 NewsItemCache.put(item)
                                 onArticleClick(item.id)
                             },
-                            isHighlighted = item.id in uiState.newItemIds,
+                            isHighlighted = item.id in newItemIds,
                         )
-                        if (index != uiState.news.lastIndex) {
-                            HorizontalDivider()
-                        }
                     }
                 }
             }
