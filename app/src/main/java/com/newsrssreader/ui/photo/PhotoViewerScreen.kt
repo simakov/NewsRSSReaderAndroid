@@ -1,9 +1,8 @@
 package com.newsrssreader.ui.photo
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.RenderEffect
-import android.graphics.RuntimeShader
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +45,7 @@ import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -58,10 +58,13 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.lerp
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.size.Precision
 import com.newsrssreader.data.saveImageToGallery
 import com.newsrssreader.data.showToast
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -76,27 +79,19 @@ private val MAX_SCALE = DOUBLE_TAP_SCALE_TIERS.last()
 private const val MAX_SHARPEN_AMOUNT = 1.4f
 private const val SHARPEN_ENGAGE_EPSILON = 0.05f
 
-// A GPU-executed AGSL unsharp-mask: samples the four direct neighbors of each pixel, subtracts
-// that local blur from the pixel to isolate edge/detail contrast, then re-adds it scaled by
-// `amount`. This is the standard, well-established technique for making an upscaled image read as
-// sharper/more detailed than plain bilinear interpolation without needing an ML model - it runs as
-// a RenderEffect on the compositor's GPU pipeline via RuntimeShader (API 33+; devices below that
-// simply display the plain, GPU-bilinear-scaled image with no extra sharpening pass).
-private const val SHARPEN_SHADER_SRC = """
-    uniform shader content;
-    uniform float amount;
-
-    half4 main(float2 coord) {
-        half4 center = content.eval(coord);
-        half4 neighborSum = content.eval(coord + float2(1.0, 0.0))
-                           + content.eval(coord + float2(-1.0, 0.0))
-                           + content.eval(coord + float2(0.0, 1.0))
-                           + content.eval(coord + float2(0.0, -1.0));
-        half4 blurred = neighborSum * 0.25;
-        half4 sharpened = center + (center - blurred) * amount;
-        return half4(clamp(sharpened.rgb, 0.0, 1.0), center.a);
-    }
-"""
+/**
+ * How large a bitmap this device may be handed for display: bounded both by what the screen can
+ * actually show at full zoom (anything past that is detail no one can see, decoded and held in
+ * memory for nothing) and by [MAX_SAFE_BITMAP_DIMENSION], past which uploading the bitmap as a
+ * GPU texture stops being safe. Coil decodes straight to this bound, so an oversized image is
+ * downsampled during decode rather than allocated in full and shrunk afterwards.
+ */
+private fun maxDisplayBitmapDimension(context: Context): Int {
+    val metrics = context.resources.displayMetrics
+    val longestScreenSide = maxOf(metrics.widthPixels, metrics.heightPixels)
+    val neededAtFullZoom = (longestScreenSide * MAX_SCALE).toInt()
+    return neededAtFullZoom.coerceIn(1, MAX_SAFE_BITMAP_DIMENSION)
+}
 
 /**
  * Full-screen photo viewer opened from any article image (hero or inline). Supports
@@ -115,8 +110,11 @@ private const val SHARPEN_SHADER_SRC = """
  * race entirely.
  *
  * The image is loaded once as a plain `ImageBitmap` (via Coil's `ImageLoader.execute`, forcing a
- * software bitmap) instead of through `AsyncImage`, so the pixels are available directly for the
- * `graphicsLayer.renderEffect` sharpening pass described on [SHARPEN_SHADER_SRC].
+ * software bitmap) instead of through `AsyncImage`, so the pixels are available directly to both
+ * sharpening paths in `ImageSharpening.kt`: a `graphicsLayer.renderEffect` AGSL pass on devices
+ * that have RuntimeShader, and a one-off CPU unsharp mask on those that don't. That file's header
+ * explains why none of the API-33-only types may be named here - getting that wrong crashed the
+ * screen outright on an API 29 device.
  *
  * This is a standalone nav destination, so the system/gesture back action closes it via
  * Navigation-Compose's own back stack without any extra handling here.
@@ -130,13 +128,19 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
     var imageBitmap by remember(imageUrl) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(imageUrl) {
         imageBitmap = null
+        val maxDimension = maxDisplayBitmapDimension(context)
         val request = ImageRequest.Builder(context)
             .data(imageUrl)
             .allowHardware(false)
+            .size(maxDimension, maxDimension)
+            .precision(Precision.INEXACT)
             .build()
         val drawable = context.imageLoader.execute(request).drawable
         if (drawable is BitmapDrawable) {
-            imageBitmap = drawable.bitmap.asImageBitmap()
+            // Belt and braces: `size` above asks the decoder for a bounded bitmap, but a cache hit
+            // or a decoder that ignores the hint can still hand back the full-size original, and
+            // that is exactly the bitmap a weak GPU refuses to upload.
+            imageBitmap = downscaledToFit(drawable.bitmap, maxDimension).asImageBitmap()
         }
     }
 
@@ -159,11 +163,10 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
     // pinching just continues the cycle from wherever it last left off.
     var zoomTierIndex by remember(imageUrl) { mutableStateOf(0) }
 
-    // API 33+ only; RuntimeShader/RenderEffect.createRuntimeShaderEffect don't exist below that,
-    // so older devices simply see the plain GPU-bilinear-scaled image with no extra sharpening.
-    val sharpenShader = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) RuntimeShader(SHARPEN_SHADER_SRC) else null
-    }
+    // Null on devices with no usable RuntimeShader (API < 33, or one that rejects it), which then
+    // take the CPU sharpening path below instead. Every API-33-only type stays inside
+    // `ImageSharpening.kt` - see its header.
+    val gpuSharpener = remember { createGpuImageSharpener() }
 
     // The scale at which the image's own pixels map 1:1 to screen pixels ("native resolution"),
     // expressed relative to this screen's `scale` variable (whose baseline of 1 = fit-to-screen).
@@ -178,6 +181,28 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
         val fit = min(container.width / bitmap.width.toFloat(), container.height / bitmap.height.toFloat())
         if (fit <= 0f) return MAX_SCALE
         return (1f / fit).coerceIn(DEFAULT_SCALE, MAX_SCALE)
+    }
+
+    // The CPU sharpening fallback, for devices the GPU path isn't available on. `derivedStateOf`
+    // rather than a plain expression on purpose: `scale` changes several times per frame while
+    // pinching, and reading it directly here would recompose the whole screen that often, whereas
+    // this recomposes only on the two frames where the threshold is actually crossed.
+    val cpuSharpeningEngaged by remember {
+        derivedStateOf {
+            gpuSharpener == null && scale > nativeMaxScale() + SHARPEN_ENGAGE_EPSILON
+        }
+    }
+    var cpuSharpenedBitmap by remember(imageUrl) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(imageUrl, imageBitmap, cpuSharpeningEngaged) {
+        val source = imageBitmap
+        if (!cpuSharpeningEngaged || source == null || cpuSharpenedBitmap != null) {
+            return@LaunchedEffect
+        }
+        // Once per image, off the main thread: a full-bitmap pass is far too slow to run per frame,
+        // but as a one-off on first zoom-in it's unnoticeable.
+        cpuSharpenedBitmap = withContext(Dispatchers.Default) {
+            sharpenedCopy(source.asAndroidBitmap())?.asImageBitmap()
+        }
     }
 
     // graphicsLayer's transformOrigin is set to the top-left corner below (rather than the
@@ -271,7 +296,10 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                 .onSizeChanged { containerSize = it },
             contentAlignment = Alignment.Center,
         ) {
-            val bitmap = imageBitmap
+            // Zoomed past native resolution with no GPU sharpener, the sharpened copy stands in for
+            // the original (until it's ready, and on any device where it couldn't be produced, this
+            // is simply the original - the viewer never waits on it).
+            val bitmap = if (cpuSharpeningEngaged) cpuSharpenedBitmap ?: imageBitmap else imageBitmap
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap,
@@ -286,13 +314,12 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                             translationY = offset.y
                             transformOrigin = TransformOrigin(0f, 0f)
 
-                            val shader = sharpenShader
+                            val sharpener = gpuSharpener
                             val nativeMax = nativeMaxScale()
-                            renderEffect = if (shader != null && scale > nativeMax + SHARPEN_ENGAGE_EPSILON) {
+                            renderEffect = if (sharpener != null && scale > nativeMax + SHARPEN_ENGAGE_EPSILON) {
                                 val digitalZoomRange = (MAX_SCALE - nativeMax).coerceAtLeast(0.01f)
                                 val digitalZoomFraction = ((scale - nativeMax) / digitalZoomRange).coerceIn(0f, 1f)
-                                shader.setFloatUniform("amount", digitalZoomFraction * MAX_SHARPEN_AMOUNT)
-                                RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
+                                sharpener.renderEffect(digitalZoomFraction * MAX_SHARPEN_AMOUNT)
                             } else {
                                 null
                             }
