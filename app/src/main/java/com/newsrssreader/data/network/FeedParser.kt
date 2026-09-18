@@ -114,7 +114,14 @@ object FeedParser {
             eventType = parser.next()
         }
 
-        return items
+        // Lenta.ru's feeds occasionally carry the same article twice (verified live: the "all"
+        // feed served two adjacent <item>s with an identical <link>). Since `id` is derived from
+        // `link`, that made the news list hand LazyColumn two items with the same key, which
+        // throws `IllegalArgumentException: Key "..." was already used` as soon as both
+        // duplicates are on screen together — i.e. the app crashed mid-scroll. Dropping the
+        // repeats here (keeping the first occurrence) fixes every list at once, and a feed that
+        // lists one story twice has nothing extra to show anyway.
+        return items.distinctBy { it.id }
     }
 
     private fun stableId(link: String?): String {

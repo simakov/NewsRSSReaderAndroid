@@ -22,11 +22,17 @@ import java.util.TimeZone
 private class DateFormatting(val locale: Locale, val timeZone: TimeZone) {
     val sameDayFormat: SimpleDateFormat =
         SimpleDateFormat("HH:mm", locale).also { it.timeZone = timeZone }
+    // Older items read "12:25, 11 октября": the time first, then the day spelled out in Russian.
+    // Pinned to the Russian locale (rather than the default one, as the numeric-only sameDay
+    // pattern can be) because the month name is content the app always shows in Russian, exactly
+    // like the article header's `publishedTimeAndRuDate`.
     val otherDayFormat: SimpleDateFormat =
-        SimpleDateFormat("d.MM HH:mm", locale).also { it.timeZone = timeZone }
+        SimpleDateFormat("HH:mm, d MMMM", RussianLocale).also { it.timeZone = timeZone }
     val nowCalendar: Calendar = Calendar.getInstance(timeZone, locale)
     val publishedCalendar: Calendar = Calendar.getInstance(timeZone, locale)
 }
+
+private val RussianLocale = Locale("ru")
 
 private val dateFormattingCache = ThreadLocal<DateFormatting>()
 
@@ -52,8 +58,9 @@ data class NewsItem(
     val rights: String? = null,
     val image: String? = null,
 ) {
-    // Assumes Locale.getDefault() resolves to a Gregorian calendar (matches the iOS
-    // counterpart's assumption); not hardcoded to Locale.US since the patterns are numeric-only.
+    // Empty for an item with no date; "HH:mm" for items from today; "HH:mm, d MMMM" (e.g.
+    // "12:25, 11 октября") for anything older. Assumes Locale.getDefault() resolves to a
+    // Gregorian calendar (matches the iOS counterpart's assumption).
     fun publishedDate(): String {
         val published = this.published ?: return ""
         val formatting = dateFormatting()
@@ -65,24 +72,14 @@ data class NewsItem(
         return format.format(published)
     }
 
-    // Used by the article detail header, which always shows a bare "HH:mm" time (never the
-    // numeric "d.MM" form publishedDate() falls back to for older items) followed by a
-    // Russian-language long date, e.g. "14:32, 15 сентября 2026". Not cached the way
+    // Used by the article detail header, which always shows the full date including the year
+    // (unlike publishedDate(), which drops the year in the list), e.g. "14:32, 15 сентября 2026".
+    // Not cached the way
     // publishedDate() is: this runs once per opened article, not once per visible list row.
     fun publishedTimeAndRuDate(): String {
         val published = this.published ?: return ""
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(published)
-        val ruDate = SimpleDateFormat("d MMMM yyyy", Locale("ru")).format(published)
+        val ruDate = SimpleDateFormat("d MMMM yyyy", RussianLocale).format(published)
         return "$time, $ruDate"
-    }
-
-    companion object {
-        val sample = NewsItem(
-            id = "sample",
-            title = "Sample headline text for placeholder rows",
-            published = Date(),
-            image = null,
-            link = "https://lenta.ru",
-        )
     }
 }

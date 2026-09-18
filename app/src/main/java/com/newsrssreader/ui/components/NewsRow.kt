@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.newsrssreader.data.model.NewsItem
@@ -24,6 +28,19 @@ import com.newsrssreader.ui.theme.AppTheme
 
 private val ThumbnailSize = 60.dp
 private val ThumbnailShape = RoundedCornerShape(4.dp)
+
+// Gutter between the text column and the thumbnail, so the headline never butts up against the
+// image. Sized as roughly two characters of the 15sp row title (an average glyph runs about half
+// the font size wide).
+private val TitleThumbnailGap = 16.dp
+
+// Skeleton bar geometry for NewsRowPlaceholder: three title lines plus a shorter date line,
+// matching the real row's line heights and 5dp title/date gap closely enough that swapping the
+// placeholder for a loaded row doesn't visibly shift the list.
+private val PlaceholderTitleLineHeight = 15.dp
+private val PlaceholderDateLineHeight = 11.dp
+private val PlaceholderLineGap = 6.dp
+private val PlaceholderShape = RoundedCornerShape(3.dp)
 
 /**
  * A single row in the news list: title + date on the left, a thumbnail (or a plain dark
@@ -48,7 +65,7 @@ fun NewsRow(item: NewsItem, modifier: Modifier = Modifier, isHighlighted: Boolea
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = TitleThumbnailGap)) {
             Text(
                 text = item.title.orEmpty(),
                 style = AppTheme.type.rowTitle,
@@ -88,14 +105,47 @@ fun NewsRow(item: NewsItem, modifier: Modifier = Modifier, isHighlighted: Boolea
  * A shimmering placeholder row used while the feed is loading, matching the iOS pattern of
  * applying `.redacted(reason: .placeholder).shimmering()` to sample rows.
  *
- * Compose has no direct `.redacted` equivalent, so this simply renders a real `NewsRow` (using
- * `NewsItem.sample`) with the whole row wrapped in `.shimmer()`. Applying the shimmer to the
- * entire row (rather than building separate placeholder-shaped boxes for the title/date/
- * thumbnail) is simpler, reuses `NewsRow` directly so the placeholder's layout can never drift
- * from the real row's layout, and the diagonal highlight sweep reads clearly over the sample
- * row's text and thumbnail without needing bespoke placeholder shapes.
+ * Compose has no direct `.redacted` equivalent, so the row's shapes are drawn explicitly as
+ * blank gray bars (three headline lines, a shorter date line, and the thumbnail square) rather
+ * than by rendering a real `NewsRow` with sample text: a placeholder built from sample text is
+ * readable, and readable placeholder text reads as actual — wrong — news. The layout mirrors
+ * `NewsRow`'s (same padding, same 60dp thumbnail, same text/thumbnail gutter) so the swap to
+ * real rows doesn't jump.
  */
 @Composable
 fun NewsRowPlaceholder(modifier: Modifier = Modifier) {
-    NewsRow(item = NewsItem.sample, modifier = modifier.shimmer())
+    Row(
+        modifier = modifier
+            .padding(10.dp)
+            .shimmer(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = TitleThumbnailGap)) {
+            PlaceholderBar(widthFraction = 1f, height = PlaceholderTitleLineHeight)
+            Spacer(modifier = Modifier.height(PlaceholderLineGap))
+            PlaceholderBar(widthFraction = 1f, height = PlaceholderTitleLineHeight)
+            Spacer(modifier = Modifier.height(PlaceholderLineGap))
+            PlaceholderBar(widthFraction = 0.6f, height = PlaceholderTitleLineHeight)
+            Spacer(modifier = Modifier.height(PlaceholderLineGap + 2.dp))
+            PlaceholderBar(widthFraction = 0.22f, height = PlaceholderDateLineHeight)
+        }
+
+        Box(
+            modifier = Modifier
+                .size(ThumbnailSize)
+                .clip(ThumbnailShape)
+                .background(AppTheme.colors.placeholder),
+        )
+    }
+}
+
+@Composable
+private fun PlaceholderBar(widthFraction: Float, height: Dp) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(widthFraction)
+            .height(height)
+            .clip(PlaceholderShape)
+            .background(AppTheme.colors.placeholder),
+    )
 }

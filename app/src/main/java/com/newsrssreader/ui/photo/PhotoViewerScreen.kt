@@ -9,8 +9,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -34,6 +33,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -54,10 +55,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.util.lerp
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.newsrssreader.data.saveImageToGallery
 import com.newsrssreader.data.showToast
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.min
@@ -138,8 +141,17 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
     }
 
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    val scale = remember { Animatable(DEFAULT_SCALE) }
-    val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+
+    // Plain snapshot state rather than `Animatable`s: a pinch/pan gesture delivers several touch
+    // events per frame, and each one's new offset is computed from the *current* one. `Animatable`
+    // can only be written from a coroutine (`snapTo` is suspend), so every event in a frame read
+    // the same stale offset and the last write won - the image ended up tracking only the final
+    // delta of each frame instead of their sum, so it visibly lagged behind the finger. Writing
+    // the state synchronously here makes each event build on the previous one, so the image
+    // follows the finger exactly. The double-tap animation is driven by `animate` below instead.
+    var scale by remember { mutableFloatStateOf(DEFAULT_SCALE) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var zoomAnimationJob by remember { mutableStateOf<Job?>(null) }
 
     // Which step of the double-tap cycle (see [DOUBLE_TAP_SCALE_TIERS]) we're currently on.
     // Tracked explicitly rather than inferred from how close `scale.value` is to each tier, since
@@ -182,11 +194,14 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
     // Keeps the content point under `focalPoint` stationary on screen while the scale changes
     // from the current value to `newScale` - this is what makes pinching/double-tapping zoom in on
     // the spot the user actually touched, rather than always zooming from the image's center.
-    fun zoomAnchoredOffset(focalPoint: Offset, newScale: Float): Offset {
-        val oldScale = scale.value
-        val contentPointUnderFocal = (focalPoint - offset.value) / oldScale
-        return focalPoint - contentPointUnderFocal * newScale
-    }
+    //
+    // `focalPoint` arrives in the *content's own* coordinates, not screen coordinates: the
+    // pointerInput modifier sits inside the graphicsLayer below, so Compose has already mapped
+    // the touch through that layer's scale before handing it over. Its position on screen is
+    // therefore `offset + focalPoint * scale`, and keeping it pinned there across the scale
+    // change leaves the offset shifted by `focalPoint * (scale - newScale)`.
+    fun zoomAnchoredOffset(focalPoint: Offset, newScale: Float): Offset =
+        offset + focalPoint * (scale - newScale)
 
     val savePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -265,17 +280,17 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = scale.value
-                            scaleY = scale.value
-                            translationX = offset.value.x
-                            translationY = offset.value.y
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offset.x
+                            translationY = offset.y
                             transformOrigin = TransformOrigin(0f, 0f)
 
                             val shader = sharpenShader
                             val nativeMax = nativeMaxScale()
-                            renderEffect = if (shader != null && scale.value > nativeMax + SHARPEN_ENGAGE_EPSILON) {
+                            renderEffect = if (shader != null && scale > nativeMax + SHARPEN_ENGAGE_EPSILON) {
                                 val digitalZoomRange = (MAX_SCALE - nativeMax).coerceAtLeast(0.01f)
-                                val digitalZoomFraction = ((scale.value - nativeMax) / digitalZoomRange).coerceIn(0f, 1f)
+                                val digitalZoomFraction = ((scale - nativeMax) / digitalZoomRange).coerceIn(0f, 1f)
                                 shader.setFloatUniform("amount", digitalZoomFraction * MAX_SHARPEN_AMOUNT)
                                 RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
                             } else {
@@ -285,14 +300,24 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                         .pointerInput(Unit) {
                             detectPinchPanAndDoubleTap(
                                 onTransform = { centroid, pan, zoom ->
-                                    val newScale = (scale.value * zoom).coerceIn(DEFAULT_SCALE, MAX_SCALE)
-                                    val newOffset = clampedOffset(
-                                        zoomAnchoredOffset(centroid, newScale) + pan,
+                                    // A touch taking over from a running double-tap animation
+                                    // wins; otherwise the animation would keep writing over the
+                                    // values the gesture is setting.
+                                    zoomAnimationJob?.cancel()
+                                    val newScale = (scale * zoom).coerceIn(DEFAULT_SCALE, MAX_SCALE)
+                                    // `pan` is measured in the same pre-scale content
+                                    // coordinates as `centroid` (see zoomAnchoredOffset), so a
+                                    // finger that travelled N screen pixels reports N / scale
+                                    // here. `offset` is a screen-space translation, so the pan
+                                    // has to be scaled back up - without this the image drifted
+                                    // behind the finger, more slowly the further it was zoomed
+                                    // in.
+                                    offset = clampedOffset(
+                                        zoomAnchoredOffset(centroid, newScale) + pan * scale,
                                         newScale,
                                         containerSize,
                                     )
-                                    scope.launch { scale.snapTo(newScale) }
-                                    scope.launch { offset.snapTo(newOffset) }
+                                    scale = newScale
                                 },
                                 onDoubleTap = { tapPosition ->
                                     zoomTierIndex = (zoomTierIndex + 1) % DOUBLE_TAP_SCALE_TIERS.size
@@ -302,8 +327,15 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                                         targetScale,
                                         containerSize,
                                     )
-                                    scope.launch { scale.animateTo(targetScale) }
-                                    scope.launch { offset.animateTo(targetOffset) }
+                                    val startScale = scale
+                                    val startOffset = offset
+                                    zoomAnimationJob?.cancel()
+                                    zoomAnimationJob = scope.launch {
+                                        animate(initialValue = 0f, targetValue = 1f) { fraction, _ ->
+                                            scale = lerp(startScale, targetScale, fraction)
+                                            offset = lerp(startOffset, targetOffset, fraction)
+                                        }
+                                    }
                                 },
                             )
                         },

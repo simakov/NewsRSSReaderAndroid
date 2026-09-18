@@ -221,4 +221,9 @@ emulator or device.
   research pass miscounted 15 real entries as 14; verify directly against a live fetch or a
   trustworthy up-to-date reference, don't just trust an old comment).
 - `NewsItem.publishedDate()`: empty string if `published` is null; `"HH:mm"` if the same calendar
-  day as now; otherwise `"d.MM HH:mm"`.
+  day as now; otherwise `"HH:mm, d MMMM"` with the month name always in Russian (e.g.
+  `"09:55, 11 сентября"`), regardless of the device locale.
+- Lenta.ru's feeds sometimes repeat the same article (same `<link>`) twice, occasionally as two
+  adjacent items. Since `NewsItem.id` is derived from the link, that used to hand LazyColumn two
+  identical keys and crash the list mid-scroll, so `FeedParser.parse` drops repeats
+  (`distinctBy { it.id }`) — don't remove that without replacing the guarantee elsewhere.

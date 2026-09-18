@@ -28,6 +28,11 @@ data class AppColors(
     // lighter charcoal than the screen background in dark mode (which is otherwise too dark for
     // a yellow tint to read as anything other than muddy).
     val newsHighlight: Color,
+    // Fill for the skeleton bars/boxes of the loading placeholders (see `NewsRowPlaceholder`).
+    // Deliberately its own token rather than `lightGrey`/`gray`, both of which resolve to white
+    // in dark mode: a placeholder must read as an empty, muted shape in both themes, otherwise
+    // the skeleton is brighter than the real content it stands in for.
+    val placeholder: Color,
 )
 
 val LightAppColors = AppColors(
@@ -42,6 +47,7 @@ val LightAppColors = AppColors(
     mutedGray = Color(0xFF636363),
     topBarBorder = Color.Transparent,
     newsHighlight = Color(0xFFFFF6D9),
+    placeholder = Color(0xFFE3E3E3),
 )
 
 val DarkAppColors = AppColors(
@@ -56,6 +62,7 @@ val DarkAppColors = AppColors(
     mutedGray = Color(0xFF9E9E9E),
     topBarBorder = Color(0xFF4D4D4D),
     newsHighlight = Color(0xFF3D3D3D),
+    placeholder = Color(0xFF3D3D3D),
 )
 
 val LocalAppColors = staticCompositionLocalOf { LightAppColors }

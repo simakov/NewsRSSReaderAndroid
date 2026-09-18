@@ -5,7 +5,13 @@ import org.junit.Test
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Date
+import java.util.Locale
 import java.util.TimeZone
+
+private val RussianMonths = listOf(
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+)
 
 class NewsItemTest {
 
@@ -29,13 +35,33 @@ class NewsItemTest {
     }
 
     @Test
-    fun `publishedDate returns date and time for other days`() {
+    fun `publishedDate returns time and a Russian date for other days`() {
         val zone = ZoneId.systemDefault()
         val reference = LocalDateTime.now(zone).minusDays(3)
         val date = Date.from(reference.withHour(9).withMinute(5).withSecond(0).withNano(0).atZone(zone).toInstant())
         val item = NewsItem(id = "1", title = "t", published = date)
-        val expected = String.format("%d.%02d %02d:%02d", reference.dayOfMonth, reference.monthValue, 9, 5)
+        val expected = "09:05, ${reference.dayOfMonth} ${RussianMonths[reference.monthValue - 1]}"
         assertEquals(expected, item.publishedDate())
+    }
+
+    // The month name is always Russian regardless of the device locale — it is app content, not
+    // a locale-formatted number (see NewsItem.otherDayFormat).
+    @Test
+    fun `publishedDate keeps the Russian month name under a non-Russian default locale`() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.US)
+            val zone = ZoneId.systemDefault()
+            val reference = LocalDateTime.now(zone).minusDays(3)
+            val date = Date.from(
+                reference.withHour(9).withMinute(5).withSecond(0).withNano(0).atZone(zone).toInstant(),
+            )
+            val item = NewsItem(id = "1", title = "t", published = date)
+            val expected = "09:05, ${reference.dayOfMonth} ${RussianMonths[reference.monthValue - 1]}"
+            assertEquals(expected, item.publishedDate())
+        } finally {
+            Locale.setDefault(original)
+        }
     }
 
     @Test
@@ -59,10 +85,10 @@ class NewsItemTest {
             val item = NewsItem(id = "1", title = "t", published = instant)
 
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-            assertEquals("15.01 12:00", item.publishedDate())
+            assertEquals("12:00, 15 января", item.publishedDate())
 
             TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
-            assertEquals("15.01 21:00", item.publishedDate())
+            assertEquals("21:00, 15 января", item.publishedDate())
         } finally {
             TimeZone.setDefault(original)
         }

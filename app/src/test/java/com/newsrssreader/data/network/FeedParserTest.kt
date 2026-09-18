@@ -43,6 +43,24 @@ class FeedParserTest {
         assertEquals(listOf("Футбол"), multiCategoryItem.categories)
     }
 
+    // Lenta.ru really does serve the same story twice in one feed (seen live in the "all" feed);
+    // two items sharing an id crash the news list's LazyColumn on a duplicate key, so the parser
+    // drops the repeats.
+    @Test
+    fun `duplicate links are collapsed into a single item`() {
+        val feed = """
+            <rss version="2.0"><channel>
+              <item><title>One</title><link>https://lenta.ru/news/a/</link></item>
+              <item><title>Two</title><link>https://lenta.ru/news/b/</link></item>
+              <item><title>One again</title><link>https://lenta.ru/news/a/</link></item>
+            </channel></rss>
+        """.trimIndent()
+        val items = FeedParser.parse(feed)
+        assertEquals(2, items.size)
+        assertEquals(listOf("One", "Two"), items.map { it.title })
+        assertEquals(items.map { it.id }.distinct().size, items.size)
+    }
+
     @Test
     fun `a later enclosure with an empty url does not clear a prior valid image`() {
         val items = FeedParser.parse(fixture("rss_sample.xml"))
