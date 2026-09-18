@@ -17,11 +17,16 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
@@ -68,11 +73,23 @@ fun HomeScreen(
     val isLoading = uiState.isLoading
     val isRefreshing = uiState.isRefreshing
 
-    // Reset scroll to the top whenever the selected tab changes (also fires harmlessly on
-    // initial composition, when the list is already at position 0).
+    // Reset scroll to the top whenever the selected tab changes - but only on a real change.
+    // This effect also runs on every (re)composition of the screen, including the one that
+    // happens on the way back from an article, where Navigation-Compose has just restored the
+    // saved `listState` position; scrolling to 0 unconditionally there would throw that
+    // restored position away, which is exactly the "list jumps back to the top after reading an
+    // article" bug. `lastTab` is saveable so the comparison survives the same restore.
+    var lastTab by rememberSaveable { mutableIntStateOf(tab) }
     LaunchedEffect(tab) {
-        listState.scrollToItem(0)
+        if (tab != lastTab) {
+            lastTab = tab
+            listState.scrollToItem(0)
+        }
     }
+
+    // The feed in display order (hero item first), handed to NewsFeedContext when a row is
+    // tapped so the article screen can walk forward through the same list.
+    val orderedFeed = remember(firstNews, feed) { listOfNotNull(firstNews) + feed }
 
     Column(
         modifier = modifier
@@ -101,6 +118,7 @@ fun HomeScreen(
                         item = firstNews,
                         onClick = {
                             firstNews?.let {
+                                NewsFeedContext.set(orderedFeed)
                                 NewsItemCache.put(it)
                                 onArticleClick(it.id)
                             }
@@ -126,6 +144,7 @@ fun HomeScreen(
                         NewsRow(
                             item = item,
                             modifier = Modifier.clickable {
+                                NewsFeedContext.set(orderedFeed)
                                 NewsItemCache.put(item)
                                 onArticleClick(item.id)
                             },

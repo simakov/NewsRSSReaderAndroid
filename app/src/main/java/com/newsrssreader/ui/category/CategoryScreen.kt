@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
@@ -100,6 +101,9 @@ fun CategoryScreen(
                         NewsRow(
                             item = item,
                             modifier = Modifier.clickable {
+                                // Records the list order so the article screen can pull-up its
+                                // way to the next item in this category. See NewsFeedContext.
+                                NewsFeedContext.set(news)
                                 NewsItemCache.put(item)
                                 onArticleClick(item.id)
                             },
