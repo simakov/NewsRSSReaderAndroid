@@ -23,8 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChromeReaderMode
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.ChromeReaderMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -128,6 +130,14 @@ private val ArticleEndGap = 40.dp
  * That happens *inside* this destination rather than as a new navigation, so the back stack stays
  * "feed -> article" however many articles deep the user reads, and back always returns to the
  * list they started from.
+ *
+ * Lenta.ru's markup drifts, and some articles (photo reports, specials, long-reads on their own
+ * templates) come back with nothing the parser recognizes as body content. Rather than show an
+ * empty page, those fall back to [ArticleReaderWebView] - the real page, stripped to a reader
+ * view - and only those get the reader-mode toggle in the top bar, second from the right, which
+ * both switches between the two renderings and indicates which one is showing. The web view is
+ * not the article sheet, so while it is up there is no pull-to-next: reaching the bottom of a web
+ * article does nothing, and the reader leaves it with back.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,6 +153,17 @@ fun ArticleDetailScreen(
     var currentId by rememberSaveable(newsItem.id) { mutableStateOf(newsItem.id) }
     val currentItem = NewsItemCache.get(currentId) ?: newsItem
     val nextItem = remember(currentId) { NewsFeedContext.next(currentId) }
+
+    // Hoisted out of ArticleBody because the top bar needs it too: whether the parse produced
+    // anything decides whether the reader-mode toggle is there at all.
+    val viewModel: ArticleViewModel = viewModel(key = currentItem.id) { ArticleViewModel(currentItem) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val webFallbackAvailable =
+        !uiState.isLoading && !uiState.hasRenderableBody() && !currentItem.link.isNullOrEmpty()
+    // Defaults to on: when the fallback is offered at all it is because the native rendering has
+    // nothing to show, so the web view is what the user wants to land on.
+    var webReaderMode by rememberSaveable(currentItem.id) { mutableStateOf(true) }
+    val showWebReader = webFallbackAvailable && webReaderMode
 
     val context = LocalContext.current
     val topBarBorderColor = AppTheme.colors.topBarBorder
@@ -164,6 +185,22 @@ fun ArticleDetailScreen(
                     }
                 },
                 actions = {
+                    if (webFallbackAvailable) {
+                        IconButton(onClick = { webReaderMode = !webReaderMode }) {
+                            Icon(
+                                imageVector = if (showWebReader) {
+                                    Icons.Default.ChromeReaderMode
+                                } else {
+                                    Icons.Outlined.ChromeReaderMode
+                                },
+                                contentDescription = "Режим чтения",
+                                // Filled + accent while the web reader is showing, outlined +
+                                // plain while it isn't, so the button says which mode is on
+                                // without needing a label.
+                                tint = if (showWebReader) AppTheme.colors.red else AppTheme.colors.white,
+                            )
+                        }
+                    }
                     IconButton(onClick = {
                         val shareText = "${currentItem.title.orEmpty()}\n\n${currentItem.link.orEmpty()}"
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
@@ -192,20 +229,40 @@ fun ArticleDetailScreen(
             )
         },
     ) { innerPadding ->
-        // Keyed so that switching articles starts the new body from scratch - fresh scroll
-        // position, no leftover pull, and a fresh ViewModel (hence a fresh parse) for the item
-        // that is now on screen.
-        key(currentItem.id) {
-            ArticleBody(
-                newsItem = currentItem,
-                nextItem = nextItem,
-                onImageClick = onImageClick,
-                onSwitchToNext = { currentId = it.id },
-                modifier = Modifier.padding(innerPadding),
+        if (showWebReader) {
+            // The whole area below the top bar, and deliberately not inside the article sheet:
+            // no nested-scroll connection here means no pull-to-next.
+            ArticleReaderWebView(
+                url = currentItem.link.orEmpty(),
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
             )
+        } else {
+            // Keyed so that switching articles starts the new body from scratch - fresh scroll
+            // position and no leftover pull for the item that is now on screen. The ViewModel is
+            // keyed on the same id one level up, so the parse is fresh too.
+            key(currentItem.id) {
+                ArticleBody(
+                    newsItem = currentItem,
+                    uiState = uiState,
+                    nextItem = nextItem,
+                    onImageClick = onImageClick,
+                    onSwitchToNext = { currentId = it.id },
+                    modifier = Modifier.padding(innerPadding),
+                )
+            }
         }
     }
 }
+
+/**
+ * Whether the parse produced anything worth laying out as an article sheet. Authors and
+ * related-material entries don't count: an article whose only blocks are those is, to the reader,
+ * a headline followed by blank paper - exactly the case the web fallback exists for.
+ */
+private fun ArticleUiState.hasRenderableBody(): Boolean =
+    content?.content?.any {
+        it !is ArticleContentType.Author && it !is ArticleContentType.RelatedMaterial
+    } == true
 
 /**
  * One article's sheet, the sheet peeking out beneath it, and the pull gesture that trades one for
@@ -224,14 +281,12 @@ fun ArticleDetailScreen(
 @Composable
 private fun ArticleBody(
     newsItem: NewsItem,
+    uiState: ArticleUiState,
     nextItem: NewsItem?,
     onImageClick: (String) -> Unit,
     onSwitchToNext: (NewsItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: ArticleViewModel = viewModel(key = newsItem.id) { ArticleViewModel(newsItem) }
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
     val scrollState = rememberScrollState()
     // The lift only means anything at the end of the article, so it is tied to the scroll
     // position. An article too short to scroll at all (maxValue == 0) is excluded: it already
