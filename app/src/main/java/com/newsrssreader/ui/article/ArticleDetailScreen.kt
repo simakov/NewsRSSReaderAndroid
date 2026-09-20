@@ -1,17 +1,16 @@
 package com.newsrssreader.ui.article
 
 import android.content.Intent
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,30 +29,35 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -77,7 +81,6 @@ import com.newsrssreader.ui.components.article.SubheadingBlock
 import com.newsrssreader.ui.components.pinchZoomPreview
 import com.newsrssreader.ui.components.shimmer
 import com.newsrssreader.ui.theme.AppTheme
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 // How far the fully-scrolled article has to be dragged up (after resistance) before releasing
@@ -92,6 +95,21 @@ private const val PullToNextResistance = 0.5f
 // short enough not to sit between the user and the next article.
 private const val ArticleSwitchDurationMs = 400
 
+// The article body is a "sheet" that normally covers the screen edge to edge. Only once it has
+// been read to the end does it lift by [SheetPeek], uncovering a sliver of the sheet below it
+// (the next article) and casting [SheetShadowHeight] of shadow onto it. The lift is an offset,
+// not padding: mid-article the text runs all the way to the bottom of the screen as before, and
+// there is no gap or shadow to suggest an edge that isn't there yet.
+private val SheetPeek = 26.dp
+private val SheetShadowHeight = 12.dp
+private val SheetShadowColor = Color.Black.copy(alpha = 0.26f)
+
+// How long the sheet takes to lift once the reader arrives at the end of the article.
+private const val SheetEdgeFadeMs = 200
+
+// Blank space between the last content block and the sheet's own bottom edge.
+private val ArticleEndGap = 40.dp
+
 /**
  * Article detail screen: title/date/main-image header followed by a body that dispatches on the
  * ViewModel's loading/error/loaded state, matching iOS's minimal inline nav bar + scrollable
@@ -100,10 +118,16 @@ private const val ArticleSwitchDurationMs = 400
  * [NewsItem], not the cache lookup.
  *
  * Dragging up past the bottom of a loaded article moves on to the next item of the feed it was
- * opened from (see [NewsFeedContext]), with the current article sliding out upwards and the next
- * one arriving from below. That happens *inside* this destination rather than as a new
- * navigation, so the back stack stays "feed -> article" however many articles deep the user
- * reads, and back always returns to the list they started from.
+ * opened from (see [NewsFeedContext]). The whole thing is one continuous movement: the pull
+ * lifts the current sheet off the sheet below, the revealed strip shows the next article's
+ * headline in the exact place it will occupy once it is the article, and releasing past the
+ * threshold simply carries that same movement on until the outgoing sheet's bottom edge reaches
+ * the top of the screen. Only then is the article swapped, so the parser starts on the next
+ * article after the animation rather than competing with it.
+ *
+ * That happens *inside* this destination rather than as a new navigation, so the back stack stays
+ * "feed -> article" however many articles deep the user reads, and back always returns to the
+ * list they started from.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -118,15 +142,13 @@ fun ArticleDetailScreen(
     // screen at all; if it somehow can't, falling back to the route's own item is harmless.
     var currentId by rememberSaveable(newsItem.id) { mutableStateOf(newsItem.id) }
     val currentItem = NewsItemCache.get(currentId) ?: newsItem
+    val nextItem = remember(currentId) { NewsFeedContext.next(currentId) }
 
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
     val topBarBorderColor = AppTheme.colors.topBarBorder
 
     Scaffold(
         modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 // Title is intentionally left empty per user request — it still appears in the
@@ -170,74 +192,89 @@ fun ArticleDetailScreen(
             )
         },
     ) { innerPadding ->
-        AnimatedContent(
-            targetState = currentItem,
-            contentKey = { it.id },
-            transitionSpec = {
-                slideInVertically(animationSpec = tween(ArticleSwitchDurationMs)) { it } togetherWith
-                    slideOutVertically(animationSpec = tween(ArticleSwitchDurationMs)) { -it }
-            },
-            label = "article",
-            modifier = Modifier.padding(innerPadding),
-        ) { item ->
+        // Keyed so that switching articles starts the new body from scratch - fresh scroll
+        // position, no leftover pull, and a fresh ViewModel (hence a fresh parse) for the item
+        // that is now on screen.
+        key(currentItem.id) {
             ArticleBody(
-                newsItem = item,
+                newsItem = currentItem,
+                nextItem = nextItem,
                 onImageClick = onImageClick,
-                onPullToNext = {
-                    val next = NewsFeedContext.next(item.id)
-                    if (next != null) {
-                        currentId = next.id
-                        true
-                    } else {
-                        coroutineScope.launch {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar("Список новостей закончен")
-                        }
-                        false
-                    }
-                },
+                onSwitchToNext = { currentId = it.id },
+                modifier = Modifier.padding(innerPadding),
             )
         }
     }
 }
 
 /**
- * One article's scrollable body, including the pull-up-for-the-next-one gesture.
+ * One article's sheet, the sheet peeking out beneath it, and the pull gesture that trades one for
+ * the other.
  *
- * The gesture is implemented as a nested-scroll connection rather than a draggable: the article
- * is an ordinary `verticalScroll` column, so this only has to pick up the scroll delta the column
- * itself could no longer consume (i.e. the user dragging up while already at the bottom), shift
- * the whole body up by a damped fraction of it, and decide on release whether the pull was long
- * enough. [onPullToNext] returns whether a next article was actually found: if it wasn't, the
- * body springs back instead of latching the gesture off.
+ * The gesture is a nested-scroll connection rather than a draggable: the article is an ordinary
+ * `verticalScroll` column, so this only has to pick up the scroll delta the column itself could
+ * no longer consume (i.e. the user dragging up while already at the bottom), lift the whole sheet
+ * by a damped fraction of it, and decide on release whether the pull was long enough. When it
+ * was, the same `pull` value keeps animating - all the way to the sheet's own height, which puts
+ * its bottom edge at the top of the screen - and [onSwitchToNext] is only called once that
+ * finishes, so the next article's header is already sitting in its final position when the real
+ * article replaces the preview. With no [nextItem] to move on to there is nothing to animate
+ * into, so the sheet springs back and the strip says so.
  */
 @Composable
 private fun ArticleBody(
     newsItem: NewsItem,
+    nextItem: NewsItem?,
     onImageClick: (String) -> Unit,
-    onPullToNext: () -> Boolean,
+    onSwitchToNext: (NewsItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Keyed per article: switching to the next item builds a fresh ViewModel for it rather than
-    // reloading into a shared one, so the outgoing article stays fully rendered while it slides
-    // away instead of blanking into a loading state mid-animation.
     val viewModel: ArticleViewModel = viewModel(key = newsItem.id) { ArticleViewModel(newsItem) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val thresholdPx = with(LocalDensity.current) { PullToNextThreshold.toPx() }
+    val scrollState = rememberScrollState()
+    // The lift only means anything at the end of the article, so it is tied to the scroll
+    // position. An article too short to scroll at all (maxValue == 0) is excluded: it already
+    // ends in blank paper, and lifting it would drag its own headline up under the top bar.
+    val atEnd by remember {
+        derivedStateOf { scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue }
+    }
+    val edgeLift = animateFloatAsState(
+        targetValue = if (atEnd) 1f else 0f,
+        animationSpec = tween(SheetEdgeFadeMs),
+        label = "sheetEdge",
+    )
+
+    val density = LocalDensity.current
+    val thresholdPx = with(density) { PullToNextThreshold.toPx() }
+    val peekPx = with(density) { SheetPeek.toPx() }
     val pull = remember { mutableFloatStateOf(0f) }
+    // Height of the whole body, needed to know how far the sheet has to travel to clear the
+    // screen; 0 until the first layout pass, which is also when the gesture can't have run yet.
+    val bodyHeight = remember { mutableIntStateOf(0) }
     // While the article is still loading its "bottom" is only the bottom of the shimmer
     // placeholder, which would make the gesture fire almost immediately on open. `triggered`
-    // latches it off once a switch is under way, so the outgoing body - still composed for the
-    // length of the animation - can't fire a second time.
+    // latches it off once a switch is under way so nothing can disturb the pull mid-animation.
     var triggered by remember { mutableStateOf(false) }
     val gestureEnabled = rememberUpdatedState(!uiState.isLoading && !triggered)
-    val pullToNext = rememberUpdatedState(onPullToNext)
+    val next = rememberUpdatedState(nextItem)
+    val switchToNext = rememberUpdatedState(onSwitchToNext)
+
+    // How far the sheet is currently raised off the one below: the end-of-article lift plus
+    // whatever the pull gesture has added. Read inside layout/draw lambdas only, so neither
+    // animation costs a recomposition.
+    fun lift(): Float = peekPx * edgeLift.value + pull.floatValue
+
+    // Where the sheet's bottom edge currently is: the seam the shadow is drawn under and the
+    // next sheet's preview hangs from. At rest this is the bottom of the screen, which is what
+    // keeps both of them invisible until there is something to show.
+    fun seamY(): Int = bodyHeight.intValue - lift().roundToInt()
 
     val nestedScrollConnection = remember(thresholdPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 // Dragging back down pays off the accumulated pull before the article scrolls.
+                if (triggered) return Offset.Zero
                 if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
                 val delta = minOf(available.y, pull.floatValue)
                 if (delta <= 0f) return Offset.Zero
@@ -259,8 +296,24 @@ private fun ArticleBody(
 
             override suspend fun onPreFling(available: Velocity): Velocity {
                 if (pull.floatValue <= 0f) return Velocity.Zero
-                if (pull.floatValue >= thresholdPx && gestureEnabled.value && pullToNext.value()) {
+                val target = next.value
+                // The pull has to make up whatever the end-of-article lift is not already
+                // covering, so that the seam lands exactly on the top of the screen and the
+                // preview headline is standing in the real header's place when they swap.
+                val sheetHeight = bodyHeight.intValue - peekPx * edgeLift.value
+                if (pull.floatValue >= thresholdPx && gestureEnabled.value &&
+                    target != null && sheetHeight > 0f
+                ) {
                     triggered = true
+                    // Carry the gesture on rather than restarting it: the sheet keeps rising from
+                    // wherever the finger left it until its bottom edge reaches the top of the
+                    // screen, and the next sheet keeps following it up behind the shadow.
+                    animate(
+                        initialValue = pull.floatValue,
+                        targetValue = sheetHeight,
+                        animationSpec = tween(ArticleSwitchDurationMs, easing = FastOutSlowInEasing),
+                    ) { value, _ -> pull.floatValue = value }
+                    switchToNext.value(target)
                 } else {
                     animate(pull.floatValue, 0f) { value, _ -> pull.floatValue = value }
                 }
@@ -270,62 +323,51 @@ private fun ArticleBody(
         }
     }
 
+    // The section shown in the meta line: the parsed rubric once it's known, otherwise the
+    // RSS-derived category carried over from the list screen.
+    val section = uiState.content?.category ?: newsItem.categories?.firstOrNull()
+
     Box(
         modifier = modifier
             .fillMaxSize()
+            // The sheet below the article: the same paper colour, told apart only by the shadow
+            // the sheet above casts onto it.
             .background(AppTheme.colors.blackInversed)
+            .clipToBounds()
+            .onSizeChanged { bodyHeight.intValue = it.height }
             .nestedScroll(nestedScrollConnection),
     ) {
-        // Revealed in the strip the pulled-up article uncovers at the bottom of the screen.
-        if (pull.floatValue > 0f) {
-            Text(
-                text = if (pull.floatValue >= thresholdPx) {
-                    "Отпустите — следующая новость"
-                } else {
-                    "Потяните вверх — следующая новость"
+        // The next sheet's own header, hanging from the seam. It is laid out exactly like the
+        // real header below, so when the animation finishes and the real article takes over,
+        // the headline is already where it needs to be and nothing jumps.
+        NextSheetPreview(
+            nextItem = nextItem,
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(0, seamY()) }
+                .graphicsLayer {
+                    // Fades in over the course of the pull, so the strip reads as empty paper
+                    // at rest and as a committed choice by the time the threshold is reached.
+                    alpha = (pull.floatValue / thresholdPx).coerceIn(0f, 1f)
                 },
-                style = AppTheme.type.meta,
-                color = AppTheme.colors.mutedGray,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp),
-            )
-        }
+        )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(0, -pull.floatValue.roundToInt()) }
+                .offset { IntOffset(0, -lift().roundToInt()) }
                 .background(AppTheme.colors.blackInversed)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(scrollState),
         ) {
-            // Time + Russian long-form date, then section (from the HTML-parsed rubric, falling
-            // back to the RSS-derived category from the previous screen), e.g.
-            // "14:32, 15 сентября 2026 · Бывший СССР".
-            val section = uiState.content?.category ?: newsItem.categories?.firstOrNull()
-            val metaLine = listOfNotNull(
-                newsItem.publishedTimeAndRuDate().ifEmpty { null },
-                section?.ifEmpty { null },
-            ).joinToString(" · ")
-            if (metaLine.isNotEmpty()) {
-                Text(
-                    text = metaLine,
-                    style = AppTheme.type.meta,
-                    color = AppTheme.colors.mutedGray,
-                    modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp, bottom = 4.dp),
-                )
-            }
-
-            Text(
-                text = newsItem.title.orEmpty(),
-                style = AppTheme.type.articleTitle,
-                color = AppTheme.colors.black,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
-            )
+            ArticleHeader(newsItem = newsItem, section = section)
 
             val announce = uiState.content?.announce
-            if (!announce.isNullOrEmpty()) {
-                Text(
+            when {
+                uiState.isLoading -> ShimmerAnnouncePlaceholder(
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                )
+
+                !announce.isNullOrEmpty() -> Text(
                     text = announce,
                     style = AppTheme.type.bodyParagraph,
                     color = AppTheme.colors.mutedGray,
@@ -377,7 +419,95 @@ private fun ArticleBody(
                     }
                 }
             }
+
+            // Blank paper between the end of the article and the sheet's edge, so reaching the
+            // bottom of the text is visibly reaching the bottom of the page.
+            Spacer(Modifier.height(ArticleEndGap))
         }
+
+        // The shadow the sheet casts on the one below, drawn last so it falls across the next
+        // sheet's headline rather than under it.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(SheetShadowHeight)
+                .offset { IntOffset(0, seamY()) }
+                .graphicsLayer {
+                    // Gone by the time the outgoing sheet has left the screen: at that point the
+                    // seam is at the very top and a dark band there would just look like grime.
+                    // Mid-article nothing needs switching off - the seam is simply off-screen.
+                    val height = bodyHeight.intValue.toFloat().coerceAtLeast(1f)
+                    alpha = (1f - pull.floatValue / height).coerceIn(0f, 1f)
+                }
+                .background(
+                    Brush.verticalGradient(listOf(SheetShadowColor, Color.Transparent)),
+                ),
+        )
+    }
+}
+
+/**
+ * The meta line and headline that open an article. Shared with [NextSheetPreview] so the preview
+ * of the next article lands pixel-for-pixel where the real thing will be.
+ *
+ * [metaColor] is overridden to transparent by the preview: the user asked for the headline alone
+ * down there, but the meta line still has to take up its space or the headline would shift
+ * upwards by its height the moment the real article arrives.
+ */
+@Composable
+private fun ArticleHeader(
+    newsItem: NewsItem,
+    section: String?,
+    modifier: Modifier = Modifier,
+    metaColor: Color = AppTheme.colors.mutedGray,
+    titleColor: Color = AppTheme.colors.black,
+) {
+    Column(modifier = modifier) {
+        // Time + Russian long-form date, then section, e.g. "14:32, 15 сентября 2026 · Бывший СССР".
+        val metaLine = listOfNotNull(
+            newsItem.publishedTimeAndRuDate().ifEmpty { null },
+            section?.ifEmpty { null },
+        ).joinToString(" · ")
+        if (metaLine.isNotEmpty()) {
+            Text(
+                text = metaLine,
+                style = AppTheme.type.meta,
+                color = metaColor,
+                modifier = Modifier.padding(horizontal = 16.dp).padding(top = 16.dp, bottom = 4.dp),
+            )
+        }
+
+        Text(
+            text = newsItem.title.orEmpty(),
+            style = AppTheme.type.articleTitle,
+            color = titleColor,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+        )
+    }
+}
+
+/**
+ * What the strip uncovered by the pull shows: the headline of the article that releasing will
+ * move on to, or - when the feed has run out - a plain statement that it has, since there is
+ * nothing to promise the user in that case.
+ */
+@Composable
+private fun NextSheetPreview(nextItem: NewsItem?, modifier: Modifier = Modifier) {
+    if (nextItem != null) {
+        ArticleHeader(
+            newsItem = nextItem,
+            section = nextItem.categories?.firstOrNull(),
+            modifier = modifier,
+            metaColor = Color.Transparent,
+        )
+    } else {
+        Text(
+            text = "Новости закончились",
+            style = AppTheme.type.meta,
+            color = AppTheme.colors.mutedGray,
+            textAlign = TextAlign.Center,
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+        )
     }
 }
 
@@ -403,6 +533,31 @@ private fun ArticleLoadingBody(modifier: Modifier = Modifier) {
         repeat(5) {
             ShimmerParagraphPlaceholder()
         }
+    }
+}
+
+/** Two shimmering bars standing in for the announce line while the article body loads. */
+@Composable
+private fun ShimmerAnnouncePlaceholder(modifier: Modifier = Modifier) {
+    val barColor = AppTheme.colors.gray.copy(alpha = 0.3f)
+    val barShape = RoundedCornerShape(4.dp)
+    Column(
+        modifier = modifier.shimmer(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .clip(barShape)
+                .background(barColor),
+        )
+        Box(
+            modifier = Modifier
+                .size(width = 240.dp, height = 16.dp)
+                .clip(barShape)
+                .background(barColor),
+        )
     }
 }
 
