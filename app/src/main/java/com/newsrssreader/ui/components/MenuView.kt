@@ -1,6 +1,7 @@
 package com.newsrssreader.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,10 +35,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.newsrssreader.data.network.LentaFeedService
 import com.newsrssreader.data.network.UpdateRelease
+import com.newsrssreader.data.parser.SimpleMarkdownParser
 import com.newsrssreader.ui.theme.AppTheme
 import com.newsrssreader.ui.update.DownloadPhase
 import com.newsrssreader.ui.update.UpdateUiState
@@ -144,6 +150,17 @@ private fun MenuItem(title: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun UpdateBanner(release: UpdateRelease, phase: DownloadPhase, onUpdateClick: () -> Unit) {
     var showNotes by remember { mutableStateOf(false) }
+    val blocks = remember(release.notes) { SimpleMarkdownParser.parse(release.notes) }
+    // Teaser above the link: headings are skipped (they'd just repeat "Что нового"), and so is
+    // the "Full Changelog" trailer GitHub appends — neither tells the user what actually changed.
+    val teaser = remember(blocks) {
+        SimpleMarkdownParser.plainText(
+            blocks.filter { block ->
+                block !is SimpleMarkdownParser.Block.Heading &&
+                    !SimpleMarkdownParser.plainText(listOf(block)).startsWith("Full Changelog")
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -157,29 +174,27 @@ private fun UpdateBanner(release: UpdateRelease, phase: DownloadPhase, onUpdateC
             color = AppTheme.colors.black,
         )
 
-        Box(modifier = Modifier.padding(top = 6.dp, bottom = 12.dp)) {
+        if (teaser.isNotEmpty()) {
+            Text(
+                text = teaser,
+                style = AppTheme.type.meta,
+                color = AppTheme.colors.mutedGray,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+
+        Box(modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)) {
             Text(
                 text = "Что нового",
                 style = AppTheme.type.meta,
                 color = AppTheme.colors.red,
+                textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable { showNotes = !showNotes },
             )
             if (showNotes) {
-                Popup(alignment = Alignment.BottomStart, onDismissRequest = { showNotes = false }) {
-                    Column(
-                        modifier = Modifier
-                            .widthIn(max = 260.dp)
-                            .background(AppTheme.colors.black, shape = RoundedCornerShape(8.dp))
-                            .clickable { showNotes = false }
-                            .padding(12.dp),
-                    ) {
-                        Text(
-                            text = release.notes,
-                            style = AppTheme.type.meta,
-                            color = AppTheme.colors.white,
-                        )
-                    }
-                }
+                ReleaseNotesPopup(blocks = blocks, onDismiss = { showNotes = false })
             }
         }
 
@@ -223,6 +238,64 @@ private fun UpdateBanner(release: UpdateRelease, phase: DownloadPhase, onUpdateC
                 Button(onClick = onUpdateClick, modifier = Modifier.fillMaxWidth()) {
                     Text("Обновить")
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The release-notes card. It floats over the banner (itself a light surface) and over whatever
+ * menu content is behind it, so it needs its own edge: `blackInversed` + a `gray` border are the
+ * only pair of tokens that stay mutually contrasting in *both* themes — a `black` background with
+ * `white` text, as this popup used to be, collapses to white-on-white in dark mode.
+ */
+@Composable
+private fun ReleaseNotesPopup(
+    blocks: List<SimpleMarkdownParser.Block>,
+    onDismiss: () -> Unit,
+) {
+    Popup(
+        alignment = Alignment.BottomStart,
+        onDismissRequest = onDismiss,
+        // Focusable so that a tap outside the card and the system back button both close it,
+        // on top of the explicit X — a non-focusable popup would receive neither.
+        properties = PopupProperties(focusable = true),
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .heightIn(max = 360.dp)
+                .background(AppTheme.colors.blackInversed, shape = RoundedCornerShape(10.dp))
+                .border(1.5.dp, AppTheme.colors.gray, RoundedCornerShape(10.dp))
+                // Swallow taps inside the card: without this they'd reach the banner underneath
+                // and the card would close on every attempt to scroll or read it.
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) {},
+        ) {
+            MarkdownBlocks(
+                blocks = blocks,
+                baseStyle = AppTheme.type.meta,
+                color = AppTheme.colors.black,
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    // Extra end padding keeps the first line clear of the close button.
+                    .padding(start = 14.dp, top = 12.dp, end = 40.dp, bottom = 14.dp),
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Закрыть",
+                    tint = AppTheme.colors.black,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
