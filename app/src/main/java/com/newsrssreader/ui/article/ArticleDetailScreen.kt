@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,8 +95,14 @@ private val PullToNextThreshold = 110.dp
 private const val PullToNextResistance = 0.5f
 
 // Duration of the article-to-article slide. Long enough to read as a deliberate transition,
-// short enough not to sit between the user and the next article.
+// short enough not to sit between the user and the next article. This is a floor, not a fixed
+// value: on hardware too slow to paint 60fps, holding to a fixed duration just means the sheet
+// gets fewer frames to appear in, and reads as a straight jump - see [ArticleSwitchMinFrames].
 private const val ArticleSwitchDurationMs = 400
+
+// However slow the device is, the switch animation is stretched (never shortened) so it still
+// gets at least this many painted frames to move across, so the motion itself stays legible.
+private const val ArticleSwitchMinFrames = 18
 
 // The article body is a "sheet" that normally covers the screen edge to edge. Only once it has
 // been read to the end does it lift by [SheetPeek], uncovering a sliver of the sheet below it
@@ -363,11 +370,35 @@ private fun ArticleBody(
                     // Carry the gesture on rather than restarting it: the sheet keeps rising from
                     // wherever the finger left it until its bottom edge reaches the top of the
                     // screen, and the next sheet keeps following it up behind the shadow.
-                    animate(
-                        initialValue = pull.floatValue,
-                        targetValue = sheetHeight,
-                        animationSpec = tween(ArticleSwitchDurationMs, easing = FastOutSlowInEasing),
-                    ) { value, _ -> pull.floatValue = value }
+                    // On hardware too slow to paint 60fps, a fixed-duration tween just gives the
+                    // slide a handful of frames to appear in, which reads as a jump rather than
+                    // motion. So this drives the animation itself with a per-frame loop that
+                    // watches how fast real frames are actually landing and stretches the total
+                    // duration (never shortens it) once it's clear the base duration won't get at
+                    // least ArticleSwitchMinFrames painted - using this device's own observed
+                    // frame time under this exact content, not a guess based on specs.
+                    val startValue = pull.floatValue
+                    val delta = sheetHeight - startValue
+                    var startNanos = 0L
+                    var frameCount = 0
+                    var targetDurationMs = ArticleSwitchDurationMs.toFloat()
+                    while (true) {
+                        var reachedEnd = false
+                        withFrameNanos { frameNanos ->
+                            if (startNanos == 0L) startNanos = frameNanos
+                            frameCount++
+                            val elapsedMs = (frameNanos - startNanos) / 1_000_000f
+                            if (frameCount == 4) {
+                                val observedFrameMs = elapsedMs / frameCount
+                                targetDurationMs =
+                                    maxOf(targetDurationMs, observedFrameMs * ArticleSwitchMinFrames)
+                            }
+                            val fraction = (elapsedMs / targetDurationMs).coerceIn(0f, 1f)
+                            pull.floatValue = startValue + delta * FastOutSlowInEasing.transform(fraction)
+                            reachedEnd = fraction >= 1f
+                        }
+                        if (reachedEnd) break
+                    }
                     switchToNext.value(target)
                 } else {
                     animate(pull.floatValue, 0f) { value, _ -> pull.floatValue = value }
@@ -399,8 +430,13 @@ private fun ArticleBody(
             nextItem = nextItem,
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(0, seamY()) }
                 .graphicsLayer {
+                    // Moving and fading via the layer's own transform (rather than an `offset {}`
+                    // relayout) lets the renderer cache this as a single GPU layer and just
+                    // re-translate/re-blend it each frame instead of re-issuing draw commands for
+                    // the whole subtree - on weak/low-end GPUs the latter drops enough frames that
+                    // the pull reads as an instant jump rather than a slide.
+                    translationY = seamY().toFloat()
                     // Fades in over the course of the pull, so the strip reads as empty paper
                     // at rest and as a committed choice by the time the threshold is reached.
                     alpha = (pull.floatValue / thresholdPx).coerceIn(0f, 1f)
@@ -410,7 +446,12 @@ private fun ArticleBody(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(0, -lift().roundToInt()) }
+                .graphicsLayer {
+                    // See the comment on NextSheetPreview above: a layer-level translation keeps
+                    // this heavy, image-laden subtree cached as one GPU layer during the pull
+                    // instead of being fully redrawn every frame.
+                    translationY = -lift()
+                }
                 .background(AppTheme.colors.blackInversed)
                 .verticalScroll(scrollState),
         ) {
