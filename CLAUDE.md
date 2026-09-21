@@ -132,6 +132,8 @@ com.newsrssreader/
 │   ├── model/          NewsItem, ArticleContent, ArticleContentType
 │   ├── network/         LentaFeedService (OkHttp client + category map), FeedParser (RSS 2.0)
 │   ├── parser/          SimpleHtmlParser (DOM/tokenizer), LentaArticleParser (article body parser)
+│   ├── store/          on-disk state: ReadStateStore (+ReadStateCodec), BookmarkStore
+│   │                      (+BookmarkImageSource), ArticleContentJson/NewsItemJson serializers
 │   ├── NewsItemCache.kt  in-memory id -> NewsItem map bridging Navigation-Compose route args
 │   └── ImageSaver.kt     save-to-gallery helper (MediaStore / legacy file+permission)
 ├── ui/
@@ -141,9 +143,54 @@ com.newsrssreader/
 │   ├── home/               HomeScreen + HomeViewModel
 │   ├── category/           CategoryScreen + CategoryViewModel
 │   ├── article/            ArticleDetailScreen + ArticleViewModel
+│   ├── bookmarks/          BookmarksScreen (reads BookmarkStore directly, no ViewModel)
 │   └── photo/               PhotoViewerScreen (full-screen zoomable image viewer)
 └── MainActivity.kt          single-activity host; owns the NavHost + MenuView overlay wiring
 ```
+
+### Persistent state (`data/store/`)
+
+Everything the app remembers between launches lives here, in hand-rolled JSON on `org.json` and
+SharedPreferences — no Room, no DataStore, no serialization library. Both stores are process-wide
+singletons in the style of `NewsItemCache`, bound to the application context by
+`NewsRssReaderApplication.onCreate()`, and both expose their state as `StateFlow`s that screens
+collect. Neither ever throws at a caller: this state is a convenience, and losing it must never
+take a screen down. Each has an `internal writeScope`/`root` test seam so its file work runs on a
+dispatcher and directory the tests control.
+
+- **`ReadStateStore`** — which articles have been opened, so `NewsRow`/`NewsTop` can dim a read
+  headline (via alpha, not a dimmer color token: `gray` and `black` both resolve to white in dark
+  mode, so there is no "slightly grayer" that works in both themes). One `id,epochDay` line per
+  mark in SharedPreferences; `ReadStateCodec` holds that format and the expiry rule as pure
+  functions. Marks expire after 14 days, which costs nothing extra — the list is already being
+  parsed at startup, so filtering it there leaves the in-memory set immediately correct, and only
+  the trimmed write-back is deferred (at `THREAD_PRIORITY_BACKGROUND`, and skipped entirely when
+  nothing expired, so an ordinary launch doesn't touch the disk). An article counts as read on
+  **either** of two signals, whichever comes first (`markRead` is idempotent): 3 seconds on
+  screen, or the body scrolled to its end. The timer is keyed on the *current article id*, not on
+  entering composition, because pull-to-next swaps content without recreating the screen, and it
+  is wrapped in `repeatOnLifecycle(RESUMED)` so the countdown doesn't run in the background. The
+  scroll signal reuses `ArticleBody`'s existing `atEnd` and reports up through `onReachedEnd`, so
+  both signals end in one place; it is the stronger of the two (only a reader scrolls a whole
+  article to its end) and it is what covers reading by pull-to-next, since that gesture is only
+  available from the end of the article. `atEnd` excludes articles too short to scroll
+  (`maxValue > 0`), so those still rely on the timer.
+- **`BookmarkStore`** — saved articles with their text and pictures, readable offline.
+  `index.json` holds every bookmark's `NewsItem` snapshot (one read renders the whole list), while
+  each `<id>/` directory holds `body.json`, `images.json` (original URL → local file) and the image
+  bytes, so saving or deleting one bookmark never rewrites another's text. `Bookmark.item` is the
+  faithful snapshot with remote URLs (what `index.json` stores, and what `images.json` is keyed on);
+  `Bookmark.displayItem` is the same item with its image pointing at the local copy, and is what
+  the screens render and what seeds `NewsItemCache`. Images come from Coil's own disk cache when
+  they're there (`CachedThenNetworkImageSource`) and are downloaded only on a miss. Bookmarks are
+  never expired on a timer, unlike read marks.
+
+The saved body is a **fallback, not a cache**: `ArticleViewModel` always fetches, and only reaches
+for `BookmarkStore.body()` when that fails (flagging it as `isOffline`, which the screen labels
+"Сохранённая копия"). That way online readers always get the live article — no staleness to reason
+about — while a bookmark still opens with no connection, from the feed as well as from the
+bookmarks list. `body()` deliberately has no `withContext` of its own so the ViewModel's injected
+dispatcher governs the whole pipeline and tests stay on virtual time.
 
 ### Design tokens (not Material3 semantics)
 
@@ -161,9 +208,12 @@ Key color tokens: `background`, `backgroundWhite`, `black`, `blackInversed`, `wh
 
 ### Navigation
 
-Single-Activity, Navigation-Compose `NavHost` with three routes, wired in `MainActivity.kt`:
+Single-Activity, Navigation-Compose `NavHost` wired in `MainActivity.kt`:
 - `"home"` — `HomeScreen`
 - `"category/{key}"` — `CategoryScreen`, `key` is a Lenta.ru category slug (e.g. `"sport"`)
+- `"bookmarks"` — `BookmarksScreen`, reached from the bookmark icon in the drawer's header, which
+  carries the saved count beside it and is **hidden entirely when there are none** (an icon leading
+  to an empty screen is an invitation to find nothing)
 - `"article/{id}"` — `ArticleDetailScreen`, `id` resolves a `NewsItem` via `NewsItemCache`
   (Navigation-Compose route args can't carry complex objects, so the caller populates the cache
   before navigating and the destination reads it back)
@@ -176,6 +226,11 @@ The category-drawer `MenuView` is rendered as a `Box`-overlaid `AnimatedVisibili
 currently-highlighted category in the menu is **derived from the nav back stack**
 (`navController.currentBackStackEntryAsState()`), not hand-tracked as separate state — this keeps
 the highlight and back-button behavior correctly in sync with whatever screen is actually showing.
+The bookmarks state is derived the same way (`currentRoute == "bookmarks"`), and like the category
+destinations it navigates with `popUpTo("home")`: the drawer switches between top-level screens
+rather than stacking them, so back from any of them lands on Home. Its header icon turns accented
+in place of a selected-category bar — one consequence being that standing on an *empty* bookmarks
+screen the drawer shows no selection at all, since the icon that would carry it is hidden at zero.
 
 ### Networking & parsing
 
