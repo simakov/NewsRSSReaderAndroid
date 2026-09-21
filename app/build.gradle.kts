@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -31,6 +32,19 @@ val releaseStoreFile = (project.findProperty("NEWSRSSREADER_RELEASE_STORE_FILE")
     ?.let { File(it) }
     ?.takeIf { it.exists() }
 
+// The AppMetrica API key is a per-developer secret kept out of the repository in
+// local.properties (already gitignored, same file that holds sdk.dir). When it's absent — a
+// fresh clone, CI — this falls back to an empty string rather than failing the build; AppMetrica
+// initialization is skipped at runtime in that case (see NewsRssReaderApplication).
+val appMetricaApiKey: String = run {
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { localProperties.load(it) }
+    }
+    localProperties.getProperty("APPMETRICA_API_KEY").orEmpty()
+}
+
 android {
     namespace = "com.newsrssreader"
     compileSdk = 35
@@ -54,6 +68,7 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GIT_TAG", "\"$gitTag\"")
+        buildConfigField("String", "APPMETRICA_API_KEY", "\"$appMetricaApiKey\"")
     }
 
     buildTypes {
@@ -110,6 +125,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.appmetrica.analytics)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

@@ -23,13 +23,31 @@ author bylines), and a full-screen photo viewer with pinch-zoom and save-to-gall
 - **Coil** for async image loading/caching
 - **JUnit4** + **Robolectric** for unit tests
 
-Dependency philosophy: keep external (production) dependencies minimal. OkHttp and Coil are the
-only two non-AndroidX/non-Kotlin runtime dependencies. RSS/Atom XML parsing and article HTML
-parsing are hand-rolled (`android.util.Xml.newPullParser()` and a custom mini HTML DOM/tokenizer)
-rather than pulling in parsing libraries (no Jsoup). Robolectric is a **test-only** dependency,
-needed because some production code calls real Android-framework APIs (`android.util.Xml`,
-`org.json.JSONObject`) that require Robolectric to execute under local JVM unit tests — this is
-acceptable since it never ships in the app.
+Dependency philosophy: keep external (production) dependencies minimal. OkHttp, Coil, and
+AppMetrica are the only non-AndroidX/non-Kotlin runtime dependencies. RSS/Atom XML parsing and
+article HTML parsing are hand-rolled (`android.util.Xml.newPullParser()` and a custom mini HTML
+DOM/tokenizer) rather than pulling in parsing libraries (no Jsoup). Robolectric is a **test-only**
+dependency, needed because some production code calls real Android-framework APIs
+(`android.util.Xml`, `org.json.JSONObject`) that require Robolectric to execute under local JVM
+unit tests — this is acceptable since it never ships in the app. AppMetrica (Yandex analytics SDK,
+`io.appmetrica.analytics:analytics`) is the one exception to "hand-roll it" — it's a vendor
+analytics/crash-reporting product, not something that makes sense to reimplement.
+
+### AppMetrica (Yandex) analytics
+
+Integrated per the [official quick-start](https://appmetrica.yandex.ru/docs/ru/sdk/android/analytics/quick-start).
+`NewsRssReaderApplication` (`app/src/main/java/com/newsrssreader/NewsRssReaderApplication.kt`,
+wired via `android:name` in `AndroidManifest.xml`) calls `AppMetrica.activate()` in `onCreate()`.
+
+The API key is a per-developer secret and must never be committed:
+- It lives in `local.properties` (already gitignored, same file as `sdk.dir`) as
+  `APPMETRICA_API_KEY=...`.
+- `app/build.gradle.kts` reads it at configuration time and exposes it as
+  `BuildConfig.APPMETRICA_API_KEY`, falling back to an empty string when the property is absent
+  (fresh clone, CI) — this mirrors how release signing degrades to an unsigned build rather than
+  failing, see "Release signing" above.
+- `NewsRssReaderApplication` skips `AppMetrica.activate()` entirely when the key is empty, so a
+  build without the key still runs — it just doesn't report analytics.
 
 ## Build and Run
 
