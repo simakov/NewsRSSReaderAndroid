@@ -33,7 +33,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.newsrssreader.data.NewsItemCache
+import com.newsrssreader.data.store.BookmarkStore
 import com.newsrssreader.ui.article.ArticleDetailScreen
+import com.newsrssreader.ui.bookmarks.BookmarksScreen
 import com.newsrssreader.ui.category.CategoryScreen
 import com.newsrssreader.ui.components.MenuView
 import com.newsrssreader.ui.home.HomeScreen
@@ -122,6 +124,10 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
         "category/{key}" -> backStackEntry?.arguments?.getString("key") ?: ""
         else -> ""
     }
+    // Derived from the back stack for the same reason the category highlight is: it always agrees
+    // with whatever screen is actually showing.
+    val bookmarksSelected = currentRoute == "bookmarks"
+    val bookmarks by BookmarkStore.bookmarks.collectAsStateWithLifecycle()
 
     BackHandler(enabled = menuShown) { menuShown = false }
 
@@ -141,6 +147,13 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
                 val key = entry.arguments?.getString("key").orEmpty()
                 CategoryScreen(
                     categoryKey = key,
+                    onMenuClick = { menuShown = true },
+                    onArticleClick = { id -> navController.navigate("article/$id") },
+                    showUpdateBadge = showUpdateBadge,
+                )
+            }
+            composable("bookmarks") {
+                BookmarksScreen(
                     onMenuClick = { menuShown = true },
                     onArticleClick = { id -> navController.navigate("article/$id") },
                     showUpdateBadge = showUpdateBadge,
@@ -192,9 +205,20 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
             MenuView(
                 selectedCategory = selectedCategory,
                 onDismiss = { menuShown = false },
+                bookmarksSelected = bookmarksSelected,
+                bookmarkCount = bookmarks.size,
+                onBookmarksClick = {
+                    menuShown = false
+                    if (!bookmarksSelected) {
+                        // popUpTo("home") matches the category destinations: the drawer switches
+                        // between top-level screens rather than stacking them, so back from here
+                        // lands on Home instead of walking every screen the drawer visited.
+                        navController.navigate("bookmarks") { popUpTo("home") }
+                    }
+                },
                 onCategorySelected = { key ->
                     menuShown = false
-                    if (key == selectedCategory) {
+                    if (key == selectedCategory && !bookmarksSelected) {
                         // Already there — nothing to do.
                     } else if (key.isEmpty()) {
                         navController.navigate("home") {

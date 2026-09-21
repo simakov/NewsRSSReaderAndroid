@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
+import com.newsrssreader.data.store.ReadStateStore
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.NewsTabs
@@ -60,6 +61,9 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    // Read here in the screen's own scope, like every ui-state field below: the set changes once
+    // per article read, not per frame, and the item lambdas capture a plain boolean from it.
+    val readIds by ReadStateStore.readIds.collectAsStateWithLifecycle()
 
     // Every field of the ui state is read here, in the screen's own recomposition scope, and the
     // lazy item lambdas below capture the resulting plain values. Reading `uiState` *inside* an
@@ -123,6 +127,7 @@ fun HomeScreen(
                                 onArticleClick(it.id)
                             }
                         },
+                        isRead = firstNews?.id in readIds,
                     )
                 }
                 item {
@@ -149,6 +154,7 @@ fun HomeScreen(
                                 onArticleClick(item.id)
                             },
                             isHighlighted = item.id in newItemIds,
+                            isRead = item.id in readIds,
                         )
                     }
                 }

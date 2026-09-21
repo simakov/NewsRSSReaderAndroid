@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.newsrssreader.data.model.ArticleContent
 import com.newsrssreader.data.model.NewsItem
 import com.newsrssreader.data.parser.LentaArticleParser
+import com.newsrssreader.data.store.BookmarkStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,11 @@ data class ArticleUiState(
     val isLoading: Boolean = true,
     val content: ArticleContent? = null,
     val error: String? = null,
+    /**
+     * True when [content] came from the saved bookmark rather than from the network, so the
+     * screen can say the reader is looking at a stored copy.
+     */
+    val isOffline: Boolean = false,
 )
 
 /**
@@ -66,6 +72,9 @@ object HttpArticleHtmlFetcher : ArticleHtmlFetcher {
 class ArticleViewModel(
     private val newsItem: NewsItem,
     private val htmlFetcher: ArticleHtmlFetcher = HttpArticleHtmlFetcher,
+    // The saved copy of a bookmarked article, used only when the network fetch fails. Injected as
+    // a function so tests don't need a real BookmarkStore bound to a directory.
+    private val savedBody: suspend (String) -> ArticleContent? = BookmarkStore::body,
     // Overridable so tests can pass the same `TestDispatcher` used for `Dispatchers.Main`,
     // keeping the whole fetch+parse pipeline on one deterministic virtual-time dispatcher
     // instead of racing against the real `Dispatchers.IO` thread pool, which `advanceUntilIdle()`
@@ -107,11 +116,28 @@ class ArticleViewModel(
                 }
                 .onFailure { e ->
                     if (e is CancellationException) throw e
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        content = null,
-                        error = e.message ?: "Не удалось загрузить статью",
-                    )
+                    // The saved copy is a fallback, not a cache: online the reader always gets the
+                    // live article, so there is no staleness to reason about, and a bookmark still
+                    // opens with no connection - from the feed as well as from the bookmarks list.
+                    // Without a network OkHttp fails on name resolution rather than waiting out a
+                    // timeout, so this costs no perceptible delay.
+                    val saved = runCatching {
+                        withContext(ioDispatcher) { savedBody(newsItem.id) }
+                    }.getOrNull()
+                    _uiState.value = if (saved != null) {
+                        _uiState.value.copy(
+                            isLoading = false,
+                            content = saved,
+                            error = null,
+                            isOffline = true,
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isLoading = false,
+                            content = null,
+                            error = e.message ?: "Не удалось загрузить статью",
+                        )
+                    }
                 }
         }
     }

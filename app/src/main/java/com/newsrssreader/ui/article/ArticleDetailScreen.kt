@@ -23,9 +23,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.ChromeReaderMode
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.ChromeReaderMode
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -67,7 +70,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
@@ -75,6 +81,9 @@ import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.data.model.ArticleContentType
 import com.newsrssreader.data.model.NewsItem
+import com.newsrssreader.data.store.BookmarkStore
+import com.newsrssreader.data.store.ReadStateStore
+import kotlinx.coroutines.delay
 import com.newsrssreader.ui.components.article.AuthorBlock
 import com.newsrssreader.ui.components.article.ImageBlock
 import com.newsrssreader.ui.components.article.InfoBoxBlock
@@ -118,6 +127,12 @@ private const val SheetEdgeFadeMs = 200
 
 // Blank space between the last content block and the sheet's own bottom edge.
 private val ArticleEndGap = 40.dp
+
+// How long an article has to be on screen before it counts as read, when nothing stronger has
+// said so already. Long enough that a mistaken tap followed by an immediate back doesn't dim the
+// headline the reader still means to come back to, short enough that it has elapsed by the time
+// anyone has actually read the opening lines.
+private const val ReadMarkDelayMs = 3_000L
 
 /**
  * Article detail screen: title/date/main-image header followed by a body that dispatches on the
@@ -175,6 +190,40 @@ fun ArticleDetailScreen(
     val context = LocalContext.current
     val topBarBorderColor = AppTheme.colors.topBarBorder
 
+    // One of the two things that mark an article read: having been on screen for
+    // ReadMarkDelayMs. The other is reaching the bottom of the body - see the effect on `atEnd`
+    // in ArticleBody, which reports it back through `onReachedEnd` so both signals end up calling
+    // the same place. Whichever happens first wins; `markRead` is idempotent.
+    //
+    // Keyed on currentId rather than on entering composition, because pulling on into the next
+    // article swaps the content without recreating this screen - the countdown has to start over
+    // for the article that is now showing, and `LaunchedEffect`'s key change does exactly that.
+    // repeatOnLifecycle(RESUMED) adds the other half: "on screen" cannot mean "counting down while
+    // the app sits in the background", so backgrounding at the second second and coming back
+    // starts the three seconds again rather than completing them unseen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(currentId, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            delay(ReadMarkDelayMs)
+            ReadStateStore.markRead(currentId)
+        }
+    }
+
+    val bookmarkedIds by BookmarkStore.bookmarkedIds.collectAsStateWithLifecycle()
+    val isBookmarked = currentItem.id in bookmarkedIds
+
+    // Fills in the body of a bookmark that was saved before the parse finished. Also covers
+    // bookmarking a still-loading article: the save happens immediately with the metadata, and the
+    // text is added here the moment it arrives. `attachBody` itself ignores an article that isn't
+    // bookmarked or already has a body, so this needs no further guard - except against re-saving
+    // a body that came out of the store in the first place.
+    val loadedContent = uiState.content
+    LaunchedEffect(currentItem.id, loadedContent, uiState.isOffline) {
+        if (loadedContent != null && !uiState.isOffline) {
+            BookmarkStore.attachBody(currentItem.id, loadedContent)
+        }
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -207,6 +256,32 @@ fun ArticleDetailScreen(
                                 tint = if (showWebReader) AppTheme.colors.red else AppTheme.colors.white,
                             )
                         }
+                    }
+                    IconButton(onClick = {
+                        if (isBookmarked) {
+                            BookmarkStore.remove(currentItem.id)
+                        } else {
+                            // Saves whatever is on screen: with the parse still running this
+                            // stores the metadata and the hero image, and the effect above adds
+                            // the text as soon as it arrives.
+                            BookmarkStore.add(currentItem, uiState.content)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isBookmarked) {
+                                Icons.Default.Bookmark
+                            } else {
+                                Icons.Outlined.BookmarkBorder
+                            },
+                            contentDescription = if (isBookmarked) {
+                                "Убрать из закладок"
+                            } else {
+                                "В закладки"
+                            },
+                            // Filled + accent when saved, outlined + plain when not, the same way
+                            // the reader-mode toggle beside it states which mode is on.
+                            tint = if (isBookmarked) AppTheme.colors.red else AppTheme.colors.white,
+                        )
                     }
                     IconButton(onClick = {
                         val shareText = "${currentItem.title.orEmpty()}\n\n${currentItem.link.orEmpty()}"
@@ -251,6 +326,7 @@ fun ArticleDetailScreen(
                 ArticleBody(
                     newsItem = currentItem,
                     uiState = uiState,
+                    onReachedEnd = { ReadStateStore.markRead(currentId) },
                     nextItem = nextItem,
                     onImageClick = onImageClick,
                     onSwitchToNext = { currentId = it.id },
@@ -289,6 +365,7 @@ private fun ArticleUiState.hasRenderableBody(): Boolean =
 private fun ArticleBody(
     newsItem: NewsItem,
     uiState: ArticleUiState,
+    onReachedEnd: () -> Unit,
     nextItem: NewsItem?,
     onImageClick: (String) -> Unit,
     onSwitchToNext: (NewsItem) -> Unit,
@@ -306,6 +383,21 @@ private fun ArticleBody(
         animationSpec = tween(SheetEdgeFadeMs),
         label = "sheetEdge",
     )
+
+    // Arriving at the bottom of the body is the other way an article counts as read, alongside the
+    // three seconds on screen. It is the stronger of the two signals: scrolling a whole article to
+    // its end is something only a reader does, where three seconds can pass on a headline nobody
+    // looked at. It also covers reading by pull-to-next for free - the gesture is only available
+    // from the end of the article, so getting there is a precondition of using it - which is the
+    // case the timer alone handled badly: a short item skimmed in two seconds and pulled straight
+    // past stayed marked unread.
+    //
+    // `atEnd` excludes an article too short to scroll (`maxValue > 0`), so those still rely on the
+    // timer, which is right - there is nothing to scroll and therefore nothing to demonstrate.
+    // Re-entering the state costs nothing, since marking an already-read article is a no-op.
+    LaunchedEffect(atEnd) {
+        if (atEnd) onReachedEnd()
+    }
 
     val density = LocalDensity.current
     val thresholdPx = with(density) { PullToNextThreshold.toPx() }
@@ -456,6 +548,17 @@ private fun ArticleBody(
                 .verticalScroll(scrollState),
         ) {
             ArticleHeader(newsItem = newsItem, section = section)
+
+            if (uiState.isOffline) {
+                // Says where the text came from, because a saved copy can be older than the
+                // article is now and the reader should not have to guess why.
+                Text(
+                    text = "Сохранённая копия",
+                    style = AppTheme.type.meta,
+                    color = AppTheme.colors.red,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                )
+            }
 
             val announce = uiState.content?.announce
             when {

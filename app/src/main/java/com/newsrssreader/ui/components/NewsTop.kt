@@ -26,6 +26,10 @@ import com.newsrssreader.ui.theme.AppTheme
 
 private val HeroHeight = 350.dp
 
+// Higher than NewsRow's 0.45: this headline is white text over a photo, so it loses contrast much
+// faster than dark-on-paper does, and 0.45 there would leave it hard to read over a bright image.
+private const val HeroReadTitleAlpha = 0.6f
+
 /**
  * Hero banner shown at the top of the Home feed: a full-bleed background photo with a
  * bottom-fade scrim and the featured article's title/date/category overlaid at the bottom.
@@ -37,7 +41,12 @@ private val HeroHeight = 350.dp
  * call site does, without every caller needing to duplicate the null-check.
  */
 @Composable
-fun NewsTop(item: NewsItem?, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
+fun NewsTop(
+    item: NewsItem?,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    isRead: Boolean = false,
+) {
     if (item?.link == null || item.image == null) return
 
     Box(
@@ -79,7 +88,10 @@ fun NewsTop(item: NewsItem?, onClick: () -> Unit = {}, modifier: Modifier = Modi
             Text(
                 text = item.title.orEmpty(),
                 style = AppTheme.type.heroTitle,
-                color = AppTheme.colors.white,
+                // Dimmed once read, matching NewsRow. The hero sits above the list it belongs to,
+                // so leaving it undimmed while the rows below it fade would read as the two
+                // disagreeing about what has been read.
+                color = AppTheme.colors.white.copy(alpha = if (isRead) HeroReadTitleAlpha else 1f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )

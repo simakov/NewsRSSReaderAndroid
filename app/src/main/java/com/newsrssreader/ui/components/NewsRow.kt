@@ -43,6 +43,17 @@ private val PlaceholderLineGap = 6.dp
 private val PlaceholderShape = RoundedCornerShape(3.dp)
 
 /**
+ * Opacity of an already-read headline. Applied as alpha rather than as a dimmer color token
+ * because this app's dark palette resolves both `gray` and `black` to white (see Color.kt), so
+ * there is no "slightly grayer than the title color" that works in both themes — but alpha does.
+ *
+ * Only the title is dimmed: the thumbnail and the date stay at full strength, so a read row still
+ * reads as a row rather than as a disabled one. 0.45 is far enough to be caught by peripheral
+ * vision during a fling, and near enough to leave the headline perfectly legible.
+ */
+private const val ReadTitleAlpha = 0.45f
+
+/**
  * A single row in the news list: title + date on the left, a thumbnail (or a plain dark
  * placeholder box when the item has no image) on the right. The thumbnail is always a fixed
  * [ThumbnailSize] (60dp) square, matching iOS's `.frame(width: 60, height: 60)` with
@@ -52,9 +63,17 @@ private val PlaceholderShape = RoundedCornerShape(3.dp)
  * [isHighlighted] tints the row background to flag it as newly arrived from a pull-to-refresh;
  * the fade itself is animated here, but when the highlight should end (and disappear) is decided
  * by the caller's ViewModel, not this composable.
+ *
+ * [isRead] dims the headline of an article that has already been opened. It is passed in rather
+ * than read from `ReadStateStore` here so the row stays a plain function of its inputs.
  */
 @Composable
-fun NewsRow(item: NewsItem, modifier: Modifier = Modifier, isHighlighted: Boolean = false) {
+fun NewsRow(
+    item: NewsItem,
+    modifier: Modifier = Modifier,
+    isHighlighted: Boolean = false,
+    isRead: Boolean = false,
+) {
     val backgroundColor by animateColorAsState(
         targetValue = if (isHighlighted) AppTheme.colors.newsHighlight else Color.Transparent,
         label = "newsRowHighlight",
@@ -69,7 +88,11 @@ fun NewsRow(item: NewsItem, modifier: Modifier = Modifier, isHighlighted: Boolea
             Text(
                 text = item.title.orEmpty(),
                 style = AppTheme.type.rowTitle,
-                color = AppTheme.colors.black,
+                color = if (isRead) {
+                    AppTheme.colors.black.copy(alpha = ReadTitleAlpha)
+                } else {
+                    AppTheme.colors.black
+                },
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(bottom = 5.dp),

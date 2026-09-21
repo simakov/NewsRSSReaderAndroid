@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
+import com.newsrssreader.data.store.ReadStateStore
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.TopPanel
@@ -51,6 +52,8 @@ fun CategoryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    // See the matching comment in HomeScreen.
+    val readIds by ReadStateStore.readIds.collectAsStateWithLifecycle()
 
     // Read here, in the screen's own recomposition scope, so the lazy item lambdas below capture
     // plain values instead of subscribing each visible row to the whole state snapshot. See the
@@ -108,6 +111,7 @@ fun CategoryScreen(
                                 onArticleClick(item.id)
                             },
                             isHighlighted = item.id in newItemIds,
+                            isRead = item.id in readIds,
                         )
                     }
                 }

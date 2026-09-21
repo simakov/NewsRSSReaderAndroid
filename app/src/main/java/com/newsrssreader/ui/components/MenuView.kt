@@ -7,9 +7,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +62,9 @@ fun MenuView(
     onDismiss: () -> Unit,
     updateState: UpdateUiState = UpdateUiState(),
     onUpdateClick: () -> Unit = {},
+    bookmarksSelected: Boolean = false,
+    bookmarkCount: Int = 0,
+    onBookmarksClick: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -90,6 +96,42 @@ fun MenuView(
                     tint = AppTheme.colors.white,
                 )
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Saved articles live in the corner of the header rather than among the feeds below:
+            // they are a place, not a Lenta.ru category, and the header is the one part of the
+            // drawer the 16-category list can never push around.
+            //
+            // Hidden entirely at zero. An icon leading to an empty screen is an invitation to find
+            // nothing, and the drawer has no room to spend saying that something doesn't exist yet.
+            // The bookmarks screen still keeps its empty state: removing the last bookmark while
+            // standing on it is reachable, opening it from here is not.
+            if (bookmarkCount > 0) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clickable(onClick = onBookmarksClick)
+                        // Mirrors the close button's 20dp on the other end; the vertical padding is
+                        // what gives the row a finger-sized target without an IconButton's fixed
+                        // 48dp box, which the count would have to sit outside of.
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = "Закладки",
+                        // Accented while the bookmarks screen is the one showing, the same way a
+                        // selected category is - this is that highlight, just in icon form.
+                        tint = if (bookmarksSelected) AppTheme.colors.red else AppTheme.colors.white,
+                    )
+                    Text(
+                        text = bookmarkCount.toString(),
+                        style = AppTheme.type.rowTitle,
+                        color = if (bookmarksSelected) AppTheme.colors.red else AppTheme.colors.white,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
         }
 
         HorizontalDivider(
@@ -106,7 +148,7 @@ fun MenuView(
         ) {
             MenuItem(
                 title = "Главная",
-                selected = selectedCategory == "",
+                selected = selectedCategory == "" && !bookmarksSelected,
                 onClick = { onCategorySelected("") },
             )
             LentaFeedService.categories.forEach { (key, title) ->
