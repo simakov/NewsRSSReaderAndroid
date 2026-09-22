@@ -10,7 +10,7 @@
 
 Запуск с чистой установки: лента, чтение статьи, отметка прочитанного, сохранение в закладки.
 
-https://github.com/user-attachments/assets/5827a197-87ed-46e3-946a-fde72d631e1c
+https://github.com/user-attachments/assets/894ae91f-ad42-464b-9294-6dea5d1aeaf5
 
 Копия записи в репозитории, на случай чтения вне GitHub —
 [docs/media/demo.mp4](docs/media/demo.mp4).
