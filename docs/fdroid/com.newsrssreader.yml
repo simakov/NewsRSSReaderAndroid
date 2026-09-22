@@ -39,7 +39,11 @@ Repo: https://github.com/simakov/NewsRSSReaderAndroid.git
 Builds:
   - versionName: 1.7.0
     versionCode: 10700
-    commit: v1.7.0
+    # The full hash, not the tag: their App-inclusion checklist requires it explicitly
+    # ("The `commit` field should be the full hash. Please don't use tag or branch in commit").
+    # This is e2e4b9e = tag v1.7.0. AutoUpdateMode fills later entries itself, so this pinning
+    # applies only to the first build.
+    commit: e2e4b9e9cfe56379673c792265300b803d4b8eff
     subdir: app
     # The fdroid flavor, not the github one: it has self-updating switched off and no
     # REQUEST_INSTALL_PACKAGES permission, because the F-Droid client does the updating for apps
