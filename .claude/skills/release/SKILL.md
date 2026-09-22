@@ -23,9 +23,9 @@ like breaking changes or small fixes.
    - Run `git status --porcelain` and `git branch --show-current`.
    - If there are uncommitted changes, tell the user they won't be part of the release
      (the tag points at HEAD, not the working tree) and confirm they want to proceed anyway.
-     **One exception:** if `app/build.gradle.kts` is among them, stop — step 5 commits that
-     file, so their edits would be swept into the version-bump commit. Ask them to commit or
-     stash it first.
+     **One exception:** if `app/build.gradle.kts` or anything under
+     `fastlane/metadata/android/*/changelogs/` is among them, stop — step 5 commits those, so
+     their edits would be swept into the version-bump commit. Ask them to commit or stash first.
    - If not on `main`, warn the user and confirm before continuing — releases are normally
      cut from `main`.
    - Confirm `gh auth status` succeeds; if not, tell the user to run `gh auth login` first
@@ -96,10 +96,12 @@ like breaking changes or small fixes.
    what gets shown to the user for confirmation and passed to `gh release create --notes-file`
    in the steps below.
 
-5. **Bump the version literals and commit, then tag that commit locally (do not push yet).**
+5. **Bump the version literals, write the F-Droid changelog, commit, then tag that commit
+   locally (do not push yet).**
    ```bash
-   ./.claude/skills/release/scripts/bump_version.sh "<NEXT_VERSION>"
-   git add app/build.gradle.kts
+   ./.claude/skills/release/scripts/bump_version.sh "<NEXT_VERSION>"   # prints VERSION_CODE
+   # then write the two changelog files described below, and:
+   git add app/build.gradle.kts fastlane/metadata/android/*/changelogs/
    git commit -m "chore: bump version to <NEXT_VERSION>"
    git tag -a "<NEXT_VERSION>" -m "<NEXT_VERSION>"
    ```
@@ -116,6 +118,34 @@ like breaking changes or small fixes.
 
    Note this commit shifts HEAD, so the "commit the release points at" shown to the user in step 7
    is this new commit, not the one that was HEAD when the run started.
+
+   **The F-Droid changelog.** F-Droid shows a "What's New" note taken from
+   `fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt` **in this repo at the tag**,
+   so it has to be written and committed here, in this same commit — there is nowhere else to add
+   it later without cutting another release. Write two files, named after the `VERSION_CODE` that
+   `bump_version.sh` printed (`v1.7.0` → `10700.txt`):
+
+   - `fastlane/metadata/android/ru-RU/changelogs/<VERSION_CODE>.txt`
+   - `fastlane/metadata/android/en-US/changelogs/<VERSION_CODE>.txt`
+
+   Both are the **same announcement from step 4**, cut down — ru-RU is it verbatim if it fits,
+   en-US is it translated into English (the F-Droid listing is bilingual, so an English reader
+   getting nothing is worse than a short note). Two differences from the GitHub release body:
+   drop the "Full Changelog" compare-link footer, which is noise in an app store, and respect a
+   hard **500-character limit** per file. Trim by dropping the least interesting bullets, not by
+   compressing every bullet into something vague. Check both before committing:
+   ```bash
+   for f in fastlane/metadata/android/*/changelogs/<VERSION_CODE>.txt; do
+     python3 -c "import sys; t=open(sys.argv[1],encoding='utf-8').read(); \
+       print(sys.argv[1], len(t), 'chars', 'OK' if len(t) <= 500 else 'TOO LONG')" "$f"
+   done
+   ```
+   (Count characters, not bytes — `wc -c` overcounts Cyrillic by a factor of two and will send
+   you trimming text that already fits.)
+
+   If this release has nothing user-visible in it (step 4 covers that case), still write both
+   files, with the same one-line "internal improvements" note — F-Droid showing an empty What's
+   New reads as a mistake.
 
    The tag is created locally but **not pushed**, keeping the publish-visible action gated behind
    the confirmation in step 7.
@@ -168,6 +198,7 @@ like breaking changes or small fixes.
    git tag -d "<NEXT_VERSION>"
    git reset --hard HEAD~1   # only if HEAD is still the bump commit
    ```
+   (`reset --hard` also discards the changelog files, since they went into that same commit.)
    Neither was pushed, so this is a fully clean, invisible-to-everyone-else rollback. Check
    `git log -1 --oneline` first — if the user committed something else in the meantime, drop the
    bump with `git revert` instead of resetting over their work.

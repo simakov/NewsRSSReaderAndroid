@@ -1,0 +1,53 @@
+# Build recipe for F-Droid. This file does not do anything sitting here — it is the copy of
+# record for what belongs at metadata/com.newsrssreader.yml in a fork of
+# https://gitlab.com/fdroid/fdroiddata, submitted as a merge request. It is kept in this repo so
+# that the recipe F-Droid builds from is reviewable alongside the code it builds, and so a change
+# here (a new category, a renamed flavor) is not discovered only after a build breaks.
+#
+# Before submitting, run `fdroid lint com.newsrssreader` and `fdroid rewritemeta
+# com.newsrssreader` inside the fdroiddata fork; rewritemeta is what settles field order and
+# formatting, so expect it to reorder this.
+#
+# The app's summary, description, screenshots and per-version changelogs are NOT here on purpose:
+# they live in fastlane/metadata/android/ in this repo, which F-Droid reads directly from the
+# tagged source. That keeps them editable without a merge request every time.
+
+AntiFeatures:
+  # Declared rather than waiting to be told: the app exists to read one specific news site, and
+  # that site is not a free-software service. Everything the app itself does is free software —
+  # this is about what it talks to.
+  NonFreeNet: {}
+
+Categories:
+  - Internet
+  - Reading
+
+License: GPL-3.0-or-later
+AuthorName: Andrey Simakov
+SourceCode: https://github.com/simakov/NewsRSSReaderAndroid
+IssueTracker: https://github.com/simakov/NewsRSSReaderAndroid/issues
+Changelog: https://github.com/simakov/NewsRSSReaderAndroid/releases
+
+RepoType: git
+Repo: https://github.com/simakov/NewsRSSReaderAndroid.git
+
+Builds:
+  - versionName: 1.7.0
+    versionCode: 10700
+    commit: v1.7.0
+    subdir: app
+    # The fdroid flavor, not the github one: it has self-updating switched off and no
+    # REQUEST_INSTALL_PACKAGES permission, because the F-Droid client does the updating for apps
+    # installed from F-Droid. See app/build.gradle.kts.
+    gradle:
+      - fdroid
+
+# With these two, a new release needs no merge request: F-Droid's bot notices a new git tag,
+# reads versionName/versionCode out of app/build.gradle.kts at that tag (which is why they are
+# plain literals there and not computed from `git describe` — the bot regex-scans the file and
+# cannot run Gradle), adds the build entry itself, builds and publishes.
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+
+CurrentVersion: 1.7.0
+CurrentVersionCode: 10700

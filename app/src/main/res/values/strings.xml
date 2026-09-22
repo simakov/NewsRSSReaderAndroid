@@ -1,3 +1,6 @@
 <resources>
-    <string name="app_name">NewsRSSReader</string>
+    <!-- The launcher label. Deliberately not "Lenta.ru": this is an unofficial reader of that
+         site's public RSS feeds with no connection to its newsroom, and naming it after the
+         source would both borrow someone else's trademark and pass for an official client. -->
+    <string name="app_name">Lenta Reader</string>
 </resources>

@@ -123,9 +123,36 @@ stops them from drifting apart once they're hand-maintained.
 
 ### License
 
-GPLv3 (`LICENSE`). This is a requirement of being in F-Droid, not just a preference — they verify
-the license and that every runtime dependency is open source, which is also why the app carries no
-analytics SDK (see above).
+GPLv3 (`LICENSE`, `GPL-3.0-or-later`). This is a requirement of being in F-Droid, not just a
+preference — they verify the license and that every runtime dependency is open source, which is
+also why the app carries no analytics SDK (see above).
+
+### F-Droid
+
+F-Droid builds the `fdroid` flavor from this repo's tags itself and signs it with its own key.
+The build recipe and the whole submission runbook are in `docs/fdroid/` — read that before
+touching anything version- or flavor-related, because F-Droid's version detection is a regex scan
+of `app/build.gradle.kts` that nothing in this repo's test suite can catch breaking.
+
+The listing text lives in `fastlane/metadata/android/{ru-RU,en-US}/` (title, short/full
+description, icon, screenshots, and one changelog file per `versionCode`). F-Droid reads it from
+the tagged source, so it is editable without a merge request — but a per-release changelog only
+ships if it was committed *before* the tag, which is why the `release` skill writes it as part of
+the version-bump commit.
+
+Two constraints worth knowing before editing those files: `short_description.txt` is capped at 80
+characters and must not end with a period, and each changelog is capped at 500 characters. Both
+limits count **characters, not bytes**, so `wc -c` will tell you a Russian string is twice as
+long as it is.
+
+### The app is called "Lenta Reader", not "Lenta.ru"
+
+`android:label="@string/app_name"` resolves to "Lenta Reader". The launcher label used to be
+"Lenta.ru" — the name of the site whose feeds it reads — which borrows someone else's trademark
+and passes for an official client; that is a plausible F-Droid rejection and a plausible
+complaint from the newsroom regardless of F-Droid. Both fastlane descriptions open by saying the
+app is unofficial and unaffiliated, and the recipe declares the `NonFreeNet` anti-feature, since
+the app exists to read one specific non-free service. Don't quietly rename it back.
 
 ### Release signing
 
