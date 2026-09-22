@@ -200,6 +200,14 @@ Two consequences worth knowing:
 `build_apk.sh` deliberately still builds the *debug* APK — it is a local development
 convenience (it drops the result in `~/Downloads`), not the release path.
 
+**Releases are cut locally, not in CI.** This was decided rather than left undone: putting the
+release keystore and its three passwords into repository secrets is the only way a GitHub Actions
+job could sign a build, and that keystore is irreplaceable — losing or leaking it means no future
+build can ever update an existing install (see the two consequences above). The `release` skill
+runs fine on the developer machine that already holds the key, so CI would buy convenience at the
+cost of copying the one unbackuppable secret into a third party. Don't add a signing workflow
+without raising it first.
+
 No Android Studio project generation step is needed — this is a standard Gradle project
 (`settings.gradle.kts` + `app/build.gradle.kts` + a Gradle version catalog at
 `gradle/libs.versions.toml`); open it directly in Android Studio or build from the CLI.
