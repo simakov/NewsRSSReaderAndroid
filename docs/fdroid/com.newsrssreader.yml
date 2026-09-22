@@ -15,11 +15,16 @@
 AntiFeatures:
   # Declared rather than waiting to be told: the app exists to read one specific news site, and
   # that site is not a free-software service. Everything the app itself does is free software —
-  # this is about what it talks to.
-  NonFreeNet: {}
+  # this is about what it talks to. The reason string is not decoration: F-Droid shows it to the
+  # user next to the anti-feature, and of the recipes in fdroiddata that declare NonFreeNet, 958
+  # give a reason this way against 122 that use the bare-list form.
+  NonFreeNet:
+    en-US: Reads the RSS feeds of Lenta.ru, which is not a free software service.
+    ru-RU: Читает RSS-ленты Lenta.ru — несвободного новостного сервиса.
 
 Categories:
   - Internet
+  - News
   - Reading
 
 License: GPL-3.0-or-later
