@@ -18,6 +18,21 @@ class BuildConfigTest {
     }
 
     @Test
+    fun `AppInfo versionTag is the tag format the updater compares against`() {
+        // UpdateViewModel decides whether a GitHub release is newer by comparing its tag_name to
+        // this string, so a mismatch in shape (a missing "v", a stray suffix) silently means
+        // "there is always an update" — the one failure mode nobody reports, because the app
+        // offering an update looks intentional.
+        assertEquals("v${BuildConfig.VERSION_NAME}", AppInfo.versionTag)
+        assertTrue(AppInfo.versionTag.matches(Regex("""v\d+\.\d+\.\d+""")))
+    }
+
+    @Test
+    fun `AppInfo REPOSITORY_URL points at the repository`() {
+        assertEquals("https://github.com/${AppInfo.REPOSITORY}", AppInfo.REPOSITORY_URL)
+    }
+
+    @Test
     fun `VERSION_CODE encodes VERSION_NAME`() {
         val (major, minor, patch) = BuildConfig.VERSION_NAME.split(".").map { it.toInt() }
         assertEquals(major * 10000 + minor * 100 + patch, BuildConfig.VERSION_CODE)

@@ -9,7 +9,7 @@
       OS auto-deriving one from the adaptive launcher icon (inconsistent pre-12, and varies by
       launcher).
 
-      The icon drawable used here (@drawable/ic_lenta_logo_splash) is the white "LENTA.RU"
+      The icon drawable used here (@drawable/ic_lenta_logo_splash) is the white "LENTA"
       wordmark centered on a padded, transparent square canvas (see that drawable's own comment)
       so the Splash Screen API's forced square-plus-circle-mask icon slot doesn't stretch or crop
       it - it renders small but fully intact and proportional, blending onto the solid black

@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.newsrssreader.AppInfo
 import com.newsrssreader.data.network.LentaFeedService
 import com.newsrssreader.data.network.UpdateRelease
 import com.newsrssreader.data.parser.SimpleMarkdownParser
@@ -65,6 +66,7 @@ fun MenuView(
     bookmarksSelected: Boolean = false,
     bookmarkCount: Int = 0,
     onBookmarksClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -160,9 +162,54 @@ fun MenuView(
             }
         }
 
+        // Pinned below the scrolling list rather than sitting at the end of it: it is not a feed,
+        // and a row that only appears once you've scrolled past sixteen categories is a row
+        // nobody finds. The divider is the same one that separates the header above.
+        HorizontalDivider(
+            color = AppTheme.colors.gray,
+            modifier = Modifier.padding(vertical = 10.dp),
+        )
+
+        AboutRow(onClick = onAboutClick)
+
+        // Still the bottom-most thing when it appears: an available update is the more urgent of
+        // the two, and unlike "О программе" it isn't there most of the time.
         updateState.release?.let { release ->
             UpdateBanner(release = release, phase = updateState.phase, onUpdateClick = onUpdateClick)
         }
+    }
+}
+
+/**
+ * The drawer's footer: opens the project's GitHub repository, and carries this build's version
+ * beside it. The version is shown rather than hidden behind the tap because it costs one line and
+ * it's the first thing anyone reporting a problem is asked for.
+ */
+@Composable
+private fun AboutRow(onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            // start = 15dp lines the text up with the category items above, whose own text sits
+            // behind a 3dp selection bar plus 12dp of padding. end/vertical mirror the header's
+            // 20dp and give the row a finger-sized target.
+            .padding(start = 15.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+    ) {
+        Text(
+            text = "О программе",
+            style = AppTheme.type.menuItemUnselected,
+            color = AppTheme.colors.white,
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Text(
+            text = AppInfo.versionTag,
+            style = AppTheme.type.meta,
+            color = AppTheme.colors.mutedGray,
+        )
     }
 }
 

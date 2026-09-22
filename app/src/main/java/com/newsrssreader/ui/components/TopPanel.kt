@@ -35,7 +35,7 @@ val TopPanelDefaultContentHeight = 34.dp
 private val TopPanelIconPadding = 5.dp
 
 /**
- * Top app bar: hamburger menu button, then the "LENTA.RU" wordmark, then a trailing spacer that
+ * Top app bar: hamburger menu button, then the "LENTA" wordmark, then a trailing spacer that
  * pushes both toward the leading edge. Mirrors the iOS `Header` view's `HStack`.
  */
 @Composable
@@ -78,7 +78,7 @@ fun TopPanel(
 
         Image(
             painter = painterResource(id = R.drawable.ic_lenta_logo),
-            contentDescription = "LENTA.RU",
+            contentDescription = "LENTA",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .clickable(onClick = onLogoClick)

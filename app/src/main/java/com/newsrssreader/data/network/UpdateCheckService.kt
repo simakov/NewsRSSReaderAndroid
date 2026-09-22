@@ -1,5 +1,6 @@
 package com.newsrssreader.data.network
 
+import com.newsrssreader.AppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -20,7 +21,7 @@ interface UpdateChecker {
 object UpdateCheckService : UpdateChecker {
     // Public repo, no auth needed for a GET on releases/latest.
     private const val API_URL =
-        "https://api.github.com/repos/simakov/NewsRSSReaderAndroid/releases/latest"
+        "https://api.github.com/repos/${AppInfo.REPOSITORY}/releases/latest"
 
     private val client = OkHttpClient()
 

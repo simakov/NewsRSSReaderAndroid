@@ -1,5 +1,7 @@
 package com.newsrssreader
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -232,6 +234,21 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
                 },
                 updateState = updateUiState,
                 onUpdateClick = { updateViewModel.startDownload(context) },
+                onAboutClick = {
+                    // The drawer stays open behind the browser on purpose: leaving the app and
+                    // coming straight back to a closed menu would look like the tap did nothing.
+                    //
+                    // A device with no browser at all throws instead of resolving, and taking the
+                    // whole app down over an informational link is the wrong trade — there is
+                    // nothing useful to say in that case either, so it stays silent.
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(AppInfo.REPOSITORY_URL)),
+                        )
+                    } catch (e: ActivityNotFoundException) {
+                        // Ignored, see above.
+                    }
+                },
             )
         }
     }

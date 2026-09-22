@@ -145,14 +145,30 @@ characters and must not end with a period, and each changelog is capped at 500 c
 limits count **characters, not bytes**, so `wc -c` will tell you a Russian string is twice as
 long as it is.
 
-### The app is called "Lenta Reader", not "Lenta.ru"
+### The app is called "Lenta Reader", and the wordmark reads "LENTA"
 
-`android:label="@string/app_name"` resolves to "Lenta Reader". The launcher label used to be
-"Lenta.ru" — the name of the site whose feeds it reads — which borrows someone else's trademark
-and passes for an official client; that is a plausible F-Droid rejection and a plausible
-complaint from the newsroom regardless of F-Droid. Both fastlane descriptions open by saying the
-app is unofficial and unaffiliated, and the recipe declares the `NonFreeNet` anti-feature, since
-the app exists to read one specific non-free service. Don't quietly rename it back.
+Two deliberate steps back from the source site's identity, both for the same reason: this is an
+unofficial reader of public RSS feeds, and looking like the official app borrows a trademark
+somebody else owns. That is a plausible F-Droid rejection and a plausible complaint from the
+newsroom regardless of F-Droid. Don't quietly put either back.
+
+- `android:label="@string/app_name"` resolves to **"Lenta Reader"** (it used to be a hardcoded
+  "Lenta.ru", with `app_name` sitting unused and disagreeing with it).
+- `drawable/ic_lenta_logo.xml` is the wordmark with the **".RU" removed** — used in `TopPanel`
+  and, via `ic_lenta_logo_splash.xml`, in the launch screen.
+
+Both fastlane descriptions open by saying the app is unofficial and unaffiliated, and the F-Droid
+recipe declares the `NonFreeNet` anti-feature, since the app exists to read one specific non-free
+service.
+
+Editing the wordmark is not a normal SVG edit. The glyphs arrived as one merged path in which
+every subpath's opening move was *relative to the previous subpath's end point*, so deleting the
+period, R and U would have shifted every glyph drawn after them. Each subpath in the current file
+opens with an absolute `M` instead, which is why the path data looks unlike a typical vector
+export. The viewport is cropped to the wordmark's real width (164 units, down from 252) and the
+height is untouched, so nothing that sizes against the drawable had to change. The splash variant
+centres the same path inside the square canvas the Splash Screen API forces, so its `translateX`
+is derived from that width — change one and the other has to follow.
 
 ### Release signing
 
@@ -296,6 +312,14 @@ Single-Activity, Navigation-Compose `NavHost` wired in `MainActivity.kt`:
 - `"photo/{encodedUrl}"` — `PhotoViewerScreen`, the image URL is `Uri.encode()`d into the route;
   Navigation-Compose already decodes path template args once during route matching, so do **not**
   add a second manual `Uri.decode()` call when reading it back (a past bug — see git history).
+
+`MenuView`'s footer is pinned below the scrolling category list rather than sitting at its end: an
+"О программе" row that opens the GitHub repository (`AppInfo.REPOSITORY_URL`) in a browser, with
+this build's `AppInfo.versionTag` beside it — shown rather than hidden behind the tap, because it
+is the first thing anyone reporting a problem gets asked for. Below it, when there is one, the
+update banner, which stays bottom-most because it is the more urgent and the only one of the two
+that isn't always there. `AppInfo` is also where the repository is identified once, for the row's
+link, `UpdateCheckService`'s GitHub API URL and the version the updater compares against.
 
 The category-drawer `MenuView` is rendered as a `Box`-overlaid `AnimatedVisibility` on top of the
 `NavHost`, with `menuShown` state lifted to `MainActivity`'s top-level `AppRoot()` composable. The

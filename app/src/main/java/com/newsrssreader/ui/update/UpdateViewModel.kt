@@ -3,6 +3,7 @@ package com.newsrssreader.ui.update
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.newsrssreader.AppInfo
 import com.newsrssreader.BuildConfig
 import com.newsrssreader.data.AndroidUpdateInstaller
 import com.newsrssreader.data.UpdateInstaller
@@ -46,12 +47,11 @@ class UpdateViewModel(
         if (updateCheckEnabled) viewModelScope.launch {
             runCatching { checker.fetchLatestRelease() }
                 .onSuccess { release ->
-                    // Tags are "v1.6.0" while versionName is "1.6.0" (Android convention,
-                    // and what F-Droid scans for), so the "v" is added back here. versionName is
-                    // a literal in build.gradle.kts bumped by the release commit the tag points
-                    // at, which makes this comparison exact without the old, fragile requirement
-                    // that the APK be built only *after* the tag already existed locally.
-                    if (release != null && release.tag != "v${BuildConfig.VERSION_NAME}") {
+                    // AppInfo.versionTag is this build's own tag, derived from the versionName
+                    // literal in build.gradle.kts that the release commit bumps. That makes the
+                    // comparison exact without the old, fragile requirement that the APK be built
+                    // only *after* the tag already existed locally.
+                    if (release != null && release.tag != AppInfo.versionTag) {
                         _uiState.value = _uiState.value.copy(release = release)
                     }
                 }
