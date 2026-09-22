@@ -39,8 +39,8 @@ android {
         // execute Gradle code to find it, so anything computed at configuration time is invisible
         // to it (every tag would look like the same version and no update would ever be offered).
         // versionCode encodes the tag as MAJOR * 10000 + MINOR * 100 + PATCH, so v1.6.0 -> 10600.
-        versionCode = 10600
-        versionName = "1.6.0"
+        versionCode = 10700
+        versionName = "1.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

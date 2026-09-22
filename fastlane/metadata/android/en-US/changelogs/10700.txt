@@ -1,0 +1,5 @@
+The app is now called Lenta Reader, and the ".RU" is gone from its wordmark: this is an unofficial reader of the Lenta.ru public RSS feeds, not affiliated with its newsroom.
+
+A new "About" row at the bottom of the category drawer shows the installed version and opens the project on GitHub.
+
+All analytics have been removed — the app no longer reports anything about you. The source is now under the GPLv3.
