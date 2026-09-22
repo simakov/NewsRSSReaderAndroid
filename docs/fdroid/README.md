@@ -58,6 +58,15 @@ git commit -am "New App: com.newsrssreader"
 git push -u origin com.newsrssreader
 ```
 
+Steps 3 and 4 are not optional polish: the pipeline runs `fdroid rewritemeta` and `fdroid
+checkupdates` as jobs that **fail if running them would change the file**. Submitting a
+hand-written recipe failed both — over one blank line after `AntiFeatures:` and a missing
+`AutoName`. Run them and commit their output.
+
+Installing `fdroidserver` with pip into a virtualenv takes about a minute
+(`python3 -m venv venv && venv/bin/pip install fdroidserver`). Homebrew's formula works too but
+pulls in gcc and about a gigabyte of bottles.
+
 Pushing to the fork starts its GitLab CI, which lints and tries to build the app. Wait for it to
 go green in the fork's **CI/CD** menu *before* opening the merge request — otherwise the first
 review comment is "fix your build". Then open the MR against `fdroiddata`'s `master`, fill in its

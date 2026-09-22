@@ -33,6 +33,10 @@ SourceCode: https://github.com/simakov/NewsRSSReaderAndroid
 IssueTracker: https://github.com/simakov/NewsRSSReaderAndroid/issues
 Changelog: https://github.com/simakov/NewsRSSReaderAndroid/releases
 
+# Filled in by `fdroid checkupdates`, not by hand — the pipeline has a job that fails if running
+# it would change anything. It is the app's own name as their tooling reads it.
+AutoName: Lenta Reader
+
 RepoType: git
 Repo: https://github.com/simakov/NewsRSSReaderAndroid.git
 
