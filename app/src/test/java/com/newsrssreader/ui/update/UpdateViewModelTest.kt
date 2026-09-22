@@ -43,7 +43,10 @@ class UpdateViewModelTest {
         private val release: UpdateRelease?,
         private val shouldThrow: Boolean = false,
     ) : UpdateChecker {
+        var fetchCallCount = 0
+
         override suspend fun fetchLatestRelease(): UpdateRelease? {
+            fetchCallCount++
             if (shouldThrow) throw IOExceptionForTest()
             return release
         }
@@ -92,27 +95,36 @@ class UpdateViewModelTest {
         override fun canInstall(context: Context) = true
     }
 
+    /**
+     * Every test here exercises the update flow itself, so it builds the ViewModel with the check
+     * force-enabled instead of inheriting BuildConfig.UPDATE_CHECK_ENABLED — otherwise the whole
+     * class would pass or fail depending on which product flavor the suite is running under
+     * (it is off in fdroid). The off state has its own test below.
+     */
+    private fun updateViewModel(checker: UpdateChecker, installer: UpdateInstaller) =
+        UpdateViewModel(checker, installer, updateCheckEnabled = true)
+
     private class IOExceptionForTest : Exception("boom")
 
     @Test
     fun `a newer tag than the current build becomes an available release`() = runTest {
         val release = UpdateRelease(tag = "v999.0.0", notes = "notes", downloadUrl = "https://example.com/app.apk")
-        val viewModel = UpdateViewModel(FakeChecker(release), FakeInstaller())
+        val viewModel = updateViewModel(FakeChecker(release), FakeInstaller())
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(release, viewModel.uiState.value.release)
     }
 
     @Test
     fun `a release tagged the same as the current build is not surfaced`() = runTest {
-        val release = UpdateRelease(tag = BuildConfig.GIT_TAG, notes = "notes", downloadUrl = "https://example.com/app.apk")
-        val viewModel = UpdateViewModel(FakeChecker(release), FakeInstaller())
+        val release = UpdateRelease(tag = "v${BuildConfig.VERSION_NAME}", notes = "notes", downloadUrl = "https://example.com/app.apk")
+        val viewModel = updateViewModel(FakeChecker(release), FakeInstaller())
         dispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.release)
     }
 
     @Test
     fun `a failed check leaves release null`() = runTest {
-        val viewModel = UpdateViewModel(FakeChecker(null, shouldThrow = true), FakeInstaller())
+        val viewModel = updateViewModel(FakeChecker(null, shouldThrow = true), FakeInstaller())
         dispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.release)
     }
@@ -121,7 +133,7 @@ class UpdateViewModelTest {
     fun `startDownload drives Downloading then ReadyToInstall and triggers install`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = FakeInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
 
         viewModel.startDownload(RuntimeEnvironment.getApplication())
@@ -135,7 +147,7 @@ class UpdateViewModelTest {
     @Test
     fun `download failure sets Failed phase`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
-        val viewModel = UpdateViewModel(FakeChecker(release), FakeInstaller(shouldThrowOnDownload = true))
+        val viewModel = updateViewModel(FakeChecker(release), FakeInstaller(shouldThrowOnDownload = true))
         dispatcher.scheduler.advanceUntilIdle()
 
         viewModel.startDownload(RuntimeEnvironment.getApplication())
@@ -148,7 +160,7 @@ class UpdateViewModelTest {
     fun `calling startDownload twice back-to-back only triggers one download`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = FakeInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
 
         val context = RuntimeEnvironment.getApplication()
@@ -162,7 +174,7 @@ class UpdateViewModelTest {
     @Test
     fun `startDownload does nothing when there is no available release`() = runTest {
         val installer = FakeInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(null), installer)
+        val viewModel = updateViewModel(FakeChecker(null), installer)
         dispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.release)
 
@@ -178,7 +190,7 @@ class UpdateViewModelTest {
     fun `retryInstallIfNeeded requests install only when phase is ReadyToInstall`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = FakeInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
         val context = RuntimeEnvironment.getApplication()
 
@@ -206,7 +218,7 @@ class UpdateViewModelTest {
     fun `retryInstallIfNeeded does not call requestInstall when the install permission still isn't granted`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = FakeInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
         val context = RuntimeEnvironment.getApplication()
 
@@ -231,7 +243,7 @@ class UpdateViewModelTest {
     fun `retryInstallIfNeeded is a no-op after a failed download`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = FakeInstaller(shouldThrowOnDownload = true)
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
         val context = RuntimeEnvironment.getApplication()
 
@@ -247,7 +259,7 @@ class UpdateViewModelTest {
     fun `uiState exposes intermediate Downloading progress mid-flight`() = runTest {
         val release = UpdateRelease("v999.0.0", "notes", "https://example.com/app.apk")
         val installer = GatedInstaller()
-        val viewModel = UpdateViewModel(FakeChecker(release), installer)
+        val viewModel = updateViewModel(FakeChecker(release), installer)
         dispatcher.scheduler.advanceUntilIdle()
 
         viewModel.startDownload(RuntimeEnvironment.getApplication())
@@ -262,5 +274,15 @@ class UpdateViewModelTest {
 
         assertTrue(viewModel.uiState.value.phase is DownloadPhase.ReadyToInstall)
         assertEquals(1, installer.downloadCallCount)
+    }
+
+    @Test
+    fun `no check is made at all when self-updating is disabled`() = runTest {
+        val release = UpdateRelease(tag = "v999.0.0", notes = "notes", downloadUrl = "https://example.com/app.apk")
+        val checker = FakeChecker(release)
+        val viewModel = UpdateViewModel(checker, FakeInstaller(), updateCheckEnabled = false)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0, checker.fetchCallCount)
+        assertNull(viewModel.uiState.value.release)
     }
 }

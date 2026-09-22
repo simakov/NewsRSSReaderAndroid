@@ -1,26 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-}
-
-// Computed once at configuration time: the most recent reachable git tag, used to populate
-// BuildConfig.GIT_TAG so a running app can compare itself against GitHub Releases' tag_name.
-// Falls back to "v0.0.0" in a checkout with no tags yet (e.g. a fresh clone before the first
-// release), so the build never fails just because no release has happened.
-val gitTag: String = run {
-    val process = ProcessBuilder("git", "describe", "--tags", "--abbrev=0")
-        .directory(rootDir)
-        .start()
-    process.waitFor()
-    val output = if (process.exitValue() == 0) {
-        process.inputStream.bufferedReader().readText().trim()
-    } else {
-        ""
-    }
-    output.ifBlank { "v0.0.0" }
 }
 
 // Release signing is configured from Gradle properties kept outside the repository (normally
@@ -31,19 +13,6 @@ val gitTag: String = run {
 val releaseStoreFile = (project.findProperty("NEWSRSSREADER_RELEASE_STORE_FILE") as String?)
     ?.let { File(it) }
     ?.takeIf { it.exists() }
-
-// The AppMetrica API key is a per-developer secret kept out of the repository in
-// local.properties (already gitignored, same file that holds sdk.dir). When it's absent — a
-// fresh clone, CI — this falls back to an empty string rather than failing the build; AppMetrica
-// initialization is skipped at runtime in that case (see NewsRssReaderApplication).
-val appMetricaApiKey: String = run {
-    val localProperties = Properties()
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use { localProperties.load(it) }
-    }
-    localProperties.getProperty("APPMETRICA_API_KEY").orEmpty()
-}
 
 android {
     namespace = "com.newsrssreader"
@@ -64,11 +33,37 @@ android {
         applicationId = "com.newsrssreader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Both are plain literals, bumped by the `release` skill in the commit that the release
+        // tag then points at. They are deliberately *not* derived from `git describe` any more:
+        // F-Droid determines an app's version by regex-scanning this file at each tag and cannot
+        // execute Gradle code to find it, so anything computed at configuration time is invisible
+        // to it (every tag would look like the same version and no update would ever be offered).
+        // versionCode encodes the tag as MAJOR * 10000 + MINOR * 100 + PATCH, so v1.6.0 -> 10600.
+        versionCode = 10600
+        versionName = "1.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "GIT_TAG", "\"$gitTag\"")
-        buildConfigField("String", "APPMETRICA_API_KEY", "\"$appMetricaApiKey\"")
+    }
+
+    // Where a build is distributed from, which is the only thing that differs between the two:
+    // an app installed from GitHub Releases has to update itself, while an app installed from
+    // F-Droid is updated by the F-Droid client and must not try. The updater's code lives in
+    // `main` for both — only this flag and the fdroid manifest's permission removal differ, so
+    // there is no second copy of anything to keep in sync.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "true")
+        }
+        create("fdroid") {
+            dimension = "distribution"
+            // F-Droid signs its own builds with its own key, so an APK downloaded from GitHub
+            // Releases cannot install over an F-Droid install anyway — offering the update would
+            // lead the user into a dead end. With this off the app never calls the GitHub API,
+            // and src/fdroid/AndroidManifest.xml drops REQUEST_INSTALL_PACKAGES so the F-Droid
+            // listing doesn't advertise a permission this build has no use for.
+            buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "false")
+        }
     }
 
     buildTypes {
@@ -125,7 +120,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.appmetrica.analytics)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

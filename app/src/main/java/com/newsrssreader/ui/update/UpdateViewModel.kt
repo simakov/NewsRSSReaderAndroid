@@ -31,16 +31,27 @@ data class UpdateUiState(
 class UpdateViewModel(
     private val checker: UpdateChecker = UpdateCheckService,
     private val installer: UpdateInstaller = AndroidUpdateInstaller,
+    // False in the fdroid flavor, where the F-Droid client does the updating. Injectable for the
+    // same reason `checker` is: the tests exercise the update flow itself and must not depend on
+    // which flavor the suite happens to be running under.
+    private val updateCheckEnabled: Boolean = BuildConfig.UPDATE_CHECK_ENABLED,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UpdateUiState())
     val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
+        // No network call at all when self-updating is off, rather than fetching and discarding:
+        // an F-Droid build should not be reaching for the GitHub API in the first place.
+        if (updateCheckEnabled) viewModelScope.launch {
             runCatching { checker.fetchLatestRelease() }
                 .onSuccess { release ->
-                    if (release != null && release.tag != BuildConfig.GIT_TAG) {
+                    // Tags are "v1.6.0" while versionName is "1.6.0" (Android convention,
+                    // and what F-Droid scans for), so the "v" is added back here. versionName is
+                    // a literal in build.gradle.kts bumped by the release commit the tag points
+                    // at, which makes this comparison exact without the old, fragile requirement
+                    // that the APK be built only *after* the tag already existed locally.
+                    if (release != null && release.tag != "v${BuildConfig.VERSION_NAME}") {
                         _uiState.value = _uiState.value.copy(release = release)
                     }
                 }

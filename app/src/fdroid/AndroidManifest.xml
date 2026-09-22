@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The fdroid flavor's only source-set difference from `main`. This build never downloads or
+    installs an APK itself (BuildConfig.UPDATE_CHECK_ENABLED is false — the F-Droid client does
+    the updating), so the permission that would let it is removed from the merged manifest
+    rather than left declared and unused: F-Droid lists an app's permissions on its download
+    page, and "install unknown apps" next to a news reader is alarming for no reason.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+</manifest>

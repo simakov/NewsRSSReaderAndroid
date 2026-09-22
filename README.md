@@ -119,9 +119,15 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 Сборка debug-APK:
 
 ```bash
-./gradlew :app:assembleDebug
-# Результат: app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleGithubDebug
+# Результат: app/build/outputs/apk/github/debug/app-github-debug.apk
 ```
+
+Приложение собирается в двух вариантах (product flavors): `github` — тот, что выкладывается
+APK-файлом в GitHub Releases и умеет обновлять себя сам, и `fdroid` — тот, что F-Droid собирает
+из исходников; в нём встроенное обновление отключено, потому что обновлениями занимается сам
+клиент F-Droid. Для локальной разработки нужен `github`: команда `assembleDebug` без указания
+варианта собрала бы оба сразу.
 
 Запуск юнит-тестов:
 
@@ -132,13 +138,13 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 Быстрая проверка компиляции:
 
 ```bash
-./gradlew :app:compileDebugKotlin
+./gradlew :app:compileGithubDebugKotlin
 ```
 
 Установка на подключённое устройство/эмулятор и запуск:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/github/debug/app-github-debug.apk
 adb shell am start -n com.newsrssreader/.MainActivity
 ```
 
@@ -156,7 +162,7 @@ adb shell am start -n com.newsrssreader/.MainActivity
 
 ```bash
 ./gradlew test                                          # весь набор тестов
-./gradlew :app:testDebugUnitTest --tests "com.newsrssreader.data.parser.FeedParserTest"  # один класс
+./gradlew :app:testGithubDebugUnitTest --tests "com.newsrssreader.data.parser.FeedParserTest"  # один класс
 ```
 
 ## Работа с лентами и категориями
@@ -166,3 +172,19 @@ adb shell am start -n com.newsrssreader/.MainActivity
   который отдаёт Lenta.ru
 - `NewsItem.publishedDate()`: пустая строка, если `published` равно null; `"HH:mm"`, если дата
   совпадает с текущим днём; иначе `"d.MM HH:mm"`
+
+## Лицензия
+
+[GNU General Public License v3.0](LICENSE) или, по вашему выбору, любая более поздняя версия.
+
+Copyright (C) 2025 Andrey Simakov
+
+Это свободная программа: вы можете распространять и изменять её на условиях GPLv3. Она
+распространяется в надежде, что будет полезной, но **без каких-либо гарантий** — даже без
+неявной гарантии товарной пригодности или пригодности для определённой цели. Полный текст
+лицензии — в файле [LICENSE](LICENSE).
+
+Приложение не собирает никакой статистики и не содержит ни аналитических SDK, ни сборщиков
+крэшей: единственные сетевые запросы, которые оно делает, — это загрузка лент и статей с
+Lenta.ru, загрузка картинок к статьям и (только в варианте `github`) проверка GitHub Releases
+на наличие обновления.

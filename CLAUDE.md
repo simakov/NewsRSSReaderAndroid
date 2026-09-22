@@ -23,31 +23,30 @@ author bylines), and a full-screen photo viewer with pinch-zoom and save-to-gall
 - **Coil** for async image loading/caching
 - **JUnit4** + **Robolectric** for unit tests
 
-Dependency philosophy: keep external (production) dependencies minimal. OkHttp, Coil, and
-AppMetrica are the only non-AndroidX/non-Kotlin runtime dependencies. RSS/Atom XML parsing and
-article HTML parsing are hand-rolled (`android.util.Xml.newPullParser()` and a custom mini HTML
-DOM/tokenizer) rather than pulling in parsing libraries (no Jsoup). Robolectric is a **test-only**
-dependency, needed because some production code calls real Android-framework APIs
-(`android.util.Xml`, `org.json.JSONObject`) that require Robolectric to execute under local JVM
-unit tests — this is acceptable since it never ships in the app. AppMetrica (Yandex analytics SDK,
-`io.appmetrica.analytics:analytics`) is the one exception to "hand-roll it" — it's a vendor
-analytics/crash-reporting product, not something that makes sense to reimplement.
+Dependency philosophy: keep external (production) dependencies minimal. OkHttp and Coil are the
+only non-AndroidX/non-Kotlin runtime dependencies. RSS/Atom XML parsing and article HTML parsing
+are hand-rolled (`android.util.Xml.newPullParser()` and a custom mini HTML DOM/tokenizer) rather
+than pulling in parsing libraries (no Jsoup). Robolectric is a **test-only** dependency, needed
+because some production code calls real Android-framework APIs (`android.util.Xml`,
+`org.json.JSONObject`) that require Robolectric to execute under local JVM unit tests — this is
+acceptable since it never ships in the app.
 
-### AppMetrica (Yandex) analytics
+### No analytics or crash reporting
 
-Integrated per the [official quick-start](https://appmetrica.yandex.ru/docs/ru/sdk/android/analytics/quick-start).
-`NewsRssReaderApplication` (`app/src/main/java/com/newsrssreader/NewsRssReaderApplication.kt`,
-wired via `android:name` in `AndroidManifest.xml`) calls `AppMetrica.activate()` in `onCreate()`.
+The app collects nothing and phones home to nobody. It ships no analytics SDK, no crash reporter
+and no telemetry of any kind; the only network traffic it makes is fetching feeds and articles
+from Lenta.ru, loading article images, and checking GitHub Releases for an update.
 
-The API key is a per-developer secret and must never be committed:
-- It lives in `local.properties` (already gitignored, same file as `sdk.dir`) as
-  `APPMETRICA_API_KEY=...`.
-- `app/build.gradle.kts` reads it at configuration time and exposes it as
-  `BuildConfig.APPMETRICA_API_KEY`, falling back to an empty string when the property is absent
-  (fresh clone, CI) — this mirrors how release signing degrades to an unsigned build rather than
-  failing, see "Release signing" above.
-- `NewsRssReaderApplication` skips `AppMetrica.activate()` entirely when the key is empty, so a
-  build without the key still runs — it just doesn't report analytics.
+This is a deliberate end state, not a gap waiting to be filled. Yandex AppMetrica was integrated
+and then removed (see git history): it is the only kind of dependency that would have shipped
+closed-source vendor code inside the APK, and none of the alternatives cleared the bar —
+Sentry is not reachable from Russia, and Aptabase has no crash reporting at all, is published
+only as an abandoned 0.0.x artifact on Maven Central, and drags in appcompat, Material Components
+and `androidx.test:monitor` that this Compose-only app has no use for.
+
+So before adding any SDK here, check with whoever is driving the work. "We have no numbers" is the
+accepted trade, and the absence of an analytics dependency is also what keeps the licensing story
+simple (every remaining runtime dependency is open source).
 
 ## Build and Run
 
@@ -56,21 +55,21 @@ The API key is a per-developer secret and must never be committed:
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 
 # Build a debug APK (day-to-day development)
-./gradlew :app:assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleGithubDebug
+# Output: app/build/outputs/apk/github/debug/app-github-debug.apk
 
-# Build the signed, minified APK that ships to users
-./gradlew :app:assembleRelease
-# Output: app/build/outputs/apk/release/app-release.apk
+# Build the signed, minified APK that ships to users via GitHub Releases
+./gradlew :app:assembleGithubRelease
+# Output: app/build/outputs/apk/github/release/app-github-release.apk
 
-# Run unit tests
+# Run unit tests (both flavors)
 ./gradlew test
 
 # Compile only (fast check)
-./gradlew :app:compileDebugKotlin
+./gradlew :app:compileGithubDebugKotlin
 
 # Install on a connected device/emulator and launch
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/github/debug/app-github-debug.apk
 adb shell am start -n com.newsrssreader/.MainActivity
 ```
 
@@ -78,6 +77,55 @@ If `JAVA_HOME` isn't already set to a JDK 17+ install, export it before running 
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 ```
+
+### Distribution channels (product flavors)
+
+There are two product flavors on a `distribution` dimension, and **`github` is the one you want
+for everything local** — plain `assembleDebug`/`assembleRelease` build both, which is almost never
+what's intended:
+
+- **`github`** — what ships as an APK on GitHub Releases. Self-updating is on
+  (`BuildConfig.UPDATE_CHECK_ENABLED = true`): `UpdateViewModel` polls the GitHub Releases API on
+  launch and offers an in-app download + install.
+- **`fdroid`** — what F-Droid builds from source. Self-updating is off, and
+  `app/src/fdroid/AndroidManifest.xml` (the flavor's *only* source-set file) removes
+  `REQUEST_INSTALL_PACKAGES` with `tools:node="remove"`. F-Droid signs its builds with its own
+  key, so an APK from GitHub Releases cannot install over an F-Droid install anyway — offering
+  that update would walk the user into a dead end, and F-Droid lists permissions on the download
+  page, so declaring one this build never uses is worse than not having it.
+
+The updater's code lives in `main` for both flavors; only the flag and that manifest differ, so
+there is no second copy of anything to keep in sync. `UpdateViewModel` takes `updateCheckEnabled`
+as a constructor parameter defaulting to `BuildConfig.UPDATE_CHECK_ENABLED` for the same reason it
+takes an injectable `checker`: `UpdateViewModelTest` forces it on, so the suite doesn't pass or
+fail depending on which flavor it happens to be running under.
+
+### Version numbers are literals, on purpose
+
+`versionCode`/`versionName` in `app/build.gradle.kts` are **plain literals**, bumped by
+`.claude/skills/release/scripts/bump_version.sh` in a commit that the release tag then points at.
+`versionName` mirrors the tag without the `v` (`v1.6.0` → `"1.6.0"`) and `versionCode` encodes it
+as `MAJOR * 10000 + MINOR * 100 + PATCH` (`v1.6.0` → `10600`).
+
+They used to be derived from `git describe` (exposed as `BuildConfig.GIT_TAG`). That had to go for
+F-Droid: it determines an app's version by regex-scanning `build.gradle.kts` at each tag and
+cannot execute Gradle code, so a computed version is invisible to it — every tag would look like
+the same version and no update would ever be offered. Two knock-on effects:
+
+- The release flow now **commits the bump before creating the tag**, so the tag points at a commit
+  that already declares the new version.
+- The updater compares `release.tag` against `"v${BuildConfig.VERSION_NAME}"` instead of
+  `GIT_TAG`, which also retires the old ordering hazard where building the APK before tagging
+  shipped a build that thought a newer version (itself) was available.
+
+`BuildConfigTest` asserts the format and that the two literals still agree, since nothing else
+stops them from drifting apart once they're hand-maintained.
+
+### License
+
+GPLv3 (`LICENSE`). This is a requirement of being in F-Droid, not just a preference — they verify
+the license and that every runtime dependency is open source, which is also why the app carries no
+analytics SDK (see above).
 
 ### Release signing
 
@@ -88,12 +136,13 @@ kept in `~/.gradle/gradle.properties`, with the keystore itself at
 `~/.android/newsrssreader-release.jks`.
 
 When those properties are absent — a fresh clone, another machine, CI — the release build does
-**not** fail; it falls back to producing `app-release-unsigned.apk`, which cannot be installed.
+**not** fail; it falls back to producing `app-github-release-unsigned.apk`, which cannot be
+installed.
 So always confirm what you actually built before handing it to anyone:
 
 ```bash
 $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs \
-  app/build/outputs/apk/release/app-release.apk   # must print CN=NewsRSSReader
+  app/build/outputs/apk/github/release/app-github-release.apk   # must print CN=NewsRSSReader
 ```
 
 Two consequences worth knowing:
@@ -283,7 +332,7 @@ emulator or device.
 
 ```bash
 ./gradlew test                                          # full suite
-./gradlew :app:testDebugUnitTest --tests "com.newsrssreader.data.parser.FeedParserTest"  # one class
+./gradlew :app:testGithubDebugUnitTest --tests "com.newsrssreader.data.parser.FeedParserTest"  # one class
 ```
 
 ## Working with feeds and categories

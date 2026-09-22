@@ -12,9 +12,11 @@ if [ ! -f local.properties ]; then
     echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 fi
 
-./gradlew :app:assembleDebug
+# The github flavor, not plain assembleDebug: that would build both flavors, and the fdroid one
+# has self-updating switched off — not what you want on a development device.
+./gradlew :app:assembleGithubDebug
 
-APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+APK_PATH="app/build/outputs/apk/github/debug/app-github-debug.apk"
 
 if [ ! -f "$APK_PATH" ]; then
     echo "Build succeeded but APK not found at $APK_PATH" >&2
