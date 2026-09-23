@@ -84,6 +84,21 @@ nothing prebuilt or obfuscated is committed, and that the app builds in isolatio
 questions; answer them in the MR. After it merges, the first build appears in the repository
 within **24–48 hours** (builds run in batches, and signing is deliberately manual).
 
+## While the merge request is still open
+
+`AutoUpdateMode: Version` only starts working once the app is **in** the catalogue. Until the MR
+is merged the recipe is pinned to one version, so a release cut in the meantime leaves the MR
+describing an older build — and the reviewers ask for it to be current ("if you release a new
+version please update this MR").
+
+So after running the `release` skill while the MR is open, update the recipe in the fdroiddata
+branch too: `versionName`, `versionCode`, `commit` (the new tag's full hash) and
+`CurrentVersion`/`CurrentVersionCode`. Then re-run `fdroid rewritemeta` and `fdroid checkupdates`,
+commit and push to the same branch — the MR updates itself.
+
+Expect the wait to be long. Their queue of untested MRs is the bottleneck, not the metadata; the
+automated pipeline passing is not the same as a human having installed the APK and tried it.
+
 ## Every release after that: nothing
 
 `UpdateCheckMode: Tags` + `AutoUpdateMode: Version` means F-Droid's bot watches this repo's tags,

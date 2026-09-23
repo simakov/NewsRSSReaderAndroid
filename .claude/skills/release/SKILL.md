@@ -230,7 +230,16 @@ like breaking changes or small fixes.
 9. **Report the result.** Once the app's `fdroiddata` metadata is merged upstream (it uses
    `UpdateCheckMode: Tags` + `AutoUpdateMode: Version`), mention that F-Droid picks the new tag
    up on its own, builds the `fdroid` flavor itself, and publishes it within 24–48 hours — no
-   action needed here. Share the release URL that `gh release create` prints, the final
+   action needed here.
+
+   **While that merge request is still open, say the opposite:** auto-update only starts once the
+   app is in the catalogue, so the MR's recipe is pinned to one version and this release leaves it
+   stale. Tell the user it needs updating (`versionName`, `versionCode`, `commit` as the new tag's
+   full hash, `CurrentVersion`/`CurrentVersionCode`, then `fdroid rewritemeta` + `fdroid
+   checkupdates`), because the reviewers ask for the MR to describe the current release. See
+   `docs/fdroid/README.md`.
+
+   Share the release URL that `gh release create` prints, the final
    version number, and confirm the APK asset is attached (`gh release view <NEXT_VERSION>
    --json assets --jq '.assets[].name'`).
 
