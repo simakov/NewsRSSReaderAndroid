@@ -1,0 +1,5 @@
+Photos are now sent through the system share sheet: pass them to a messenger or save them to Files. The original file goes out, not a recompressed copy, and the app no longer needs access to your device's storage.
+
+In the fallback reading mode (when an article opens as the site's own page) the app no longer loads third-party counters and ads, and links to other sites open in your browser.
+
+Stories from other sites, such as moslenta.ru, no longer appear in the feeds.
