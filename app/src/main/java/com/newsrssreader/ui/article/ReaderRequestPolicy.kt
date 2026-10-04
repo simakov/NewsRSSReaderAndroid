@@ -8,23 +8,13 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.newsrssreader.data.network.isFirstPartyHost
 import java.io.ByteArrayInputStream
 
 /**
- * True for `lenta.ru` and anything under it (`icdn.lenta.ru`, `www.lenta.ru`), and nothing else.
- *
- * The reader web view runs the site's own scripts, and a live article page also pulls in Yandex
- * Metrica/Webvisor, TNS, Rambler and Top.Mail.Ru counters. Everything outside this predicate is
- * refused, so the app's claim of using the network only for Lenta.ru holds for the fallback too.
- * The dot in the suffix is what keeps `evil-lenta.ru` out.
- */
-internal fun isFirstPartyHost(host: String?): Boolean {
-    val h = host?.lowercase() ?: return false
-    return h == "lenta.ru" || h.endsWith(".lenta.ru")
-}
-
-/**
- * The reader's [WebViewClient]: blocks third-party requests, keeps first-party navigation inside
+ * The reader's [WebViewClient]. The reader runs the site's own scripts, and a live article page
+ * also pulls in Yandex Metrica/Webvisor, TNS, Rambler and Top.Mail.Ru counters; everything outside
+ * [isFirstPartyHost] is refused. It blocks third-party requests, keeps first-party navigation inside
  * the reader, and sends every other link to the system browser.
  */
 internal open class ReaderWebViewClient(private val context: Context) : WebViewClient() {

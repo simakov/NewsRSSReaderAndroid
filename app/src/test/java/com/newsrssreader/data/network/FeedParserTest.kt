@@ -61,6 +61,31 @@ class FeedParserTest {
         assertEquals(items.map { it.id }.distinct().size, items.size)
     }
 
+    // The "top" feed has been seen carrying a story on moslenta.ru. The app only reads Lenta.ru,
+    // and the reader web view refuses every other host, so such items are left out entirely.
+    @Test
+    fun `items linking outside lenta ru are dropped`() {
+        val feed = """
+            <rss version="2.0"><channel>
+              <item><title>Ours</title><link>https://lenta.ru/news/a/</link></item>
+              <item><title>Moscow</title><link>https://moslenta.ru/news/lyudi/b.htm</link></item>
+              <item><title>Lookalike</title><link>https://lenta.ru.evil.com/c/</link></item>
+              <item><title>Subdomain</title><link>https://www.lenta.ru/news/d/</link></item>
+            </channel></rss>
+        """.trimIndent()
+        assertEquals(listOf("Ours", "Subdomain"), FeedParser.parse(feed).map { it.title })
+    }
+
+    @Test
+    fun `an item with no link is kept`() {
+        val feed = """
+            <rss version="2.0"><channel>
+              <item><title>No link</title></item>
+            </channel></rss>
+        """.trimIndent()
+        assertEquals(listOf("No link"), FeedParser.parse(feed).map { it.title })
+    }
+
     @Test
     fun `a later enclosure with an empty url does not clear a prior valid image`() {
         val items = FeedParser.parse(fixture("rss_sample.xml"))

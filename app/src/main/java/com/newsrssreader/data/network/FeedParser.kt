@@ -121,7 +121,14 @@ object FeedParser {
         // duplicates are on screen together — i.e. the app crashed mid-scroll. Dropping the
         // repeats here (keeping the first occurrence) fixes every list at once, and a feed that
         // lists one story twice has nothing extra to show anyway.
-        return items.distinctBy { it.id }
+        //
+        // Items that link outside Lenta.ru are dropped too: the "top" feed has carried stories on
+        // moslenta.ru, which the article parser can't read and the reader web view (rightly)
+        // refuses to load, so they could only ever open as an error page. An item with no link at
+        // all is kept; that is a different problem and not this filter's to decide.
+        return items
+            .filter { it.link.isNullOrBlank() || isFirstPartyUrl(it.link) }
+            .distinctBy { it.id }
     }
 
     private fun stableId(link: String?): String {

@@ -368,7 +368,9 @@ screen the drawer shows no selection at all, since the icon that would carry it 
   blocks loads the real page with JavaScript on, so a live article page would run Lenta.ru's
   Yandex Metrica/Webvisor, TNS, Rambler and Top.Mail.Ru counters. `ReaderWebViewClient` therefore
   answers every request to a host outside `lenta.ru`/`*.lenta.ru` with an empty 403
-  (`isFirstPartyHost`), keeps first-party links inside the reader, and sends any other http(s) link to
+  (`isFirstPartyHost`, in `data/network/` because `FeedParser` uses the same rule to drop feed
+  items that link outside Lenta.ru - the "top" feed has carried stories on moslenta.ru, which
+  would otherwise open as an error page), keeps first-party links inside the reader, and sends any other http(s) link to
   the system browser (other schemes are dropped). This is what keeps the "no ads and no trackers"
   line in the fastlane descriptions true; the cost is that third-party images in the page, such as
   the team logos from `img.championat.com` in sports articles, don't load. The allowlist was checked

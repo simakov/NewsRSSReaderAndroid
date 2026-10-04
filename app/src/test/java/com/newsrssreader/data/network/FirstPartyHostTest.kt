@@ -1,10 +1,10 @@
-package com.newsrssreader.ui.article
+package com.newsrssreader.data.network
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ReaderRequestPolicyTest {
+class FirstPartyHostTest {
 
     @Test
     fun `lenta ru and its subdomains are first party`() {
