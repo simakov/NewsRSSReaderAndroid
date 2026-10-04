@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Matches where AndroidUpdateInstaller (Task 4) writes the downloaded APK: context.cacheDir. -->
+    <!-- cacheDir: where AndroidUpdateInstaller writes the downloaded APK, and (under shared/) where
+         ImageSharer writes the photo it hands to the share sheet. -->
     <cache-path name="updates" path="." />
 </paths>

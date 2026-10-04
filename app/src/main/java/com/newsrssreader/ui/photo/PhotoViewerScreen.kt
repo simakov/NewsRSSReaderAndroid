@@ -1,13 +1,7 @@
 package com.newsrssreader.ui.photo
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.drawable.BitmapDrawable
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,7 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,8 +53,7 @@ import androidx.compose.ui.util.lerp
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Precision
-import com.newsrssreader.data.saveImageToGallery
-import com.newsrssreader.data.showToast
+import com.newsrssreader.data.shareImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -228,32 +221,9 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
     fun zoomAnchoredOffset(focalPoint: Offset, newScale: Float): Offset =
         offset + focalPoint * (scale - newScale)
 
-    val savePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) {
-            scope.launch {
-                saveImageToGallery(context, context.imageLoader, imageUrl)
-            }
-        } else {
-            showToast(context, "Нужно разрешение для сохранения фото")
-        }
-    }
-
-    fun onSaveClick() {
-        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.O..Build.VERSION_CODES.P) {
-            val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
-            val granted = ContextCompat.checkSelfPermission(
-                context,
-                permission,
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                savePermissionLauncher.launch(permission)
-                return
-            }
-        }
+    fun onShareClick() {
         scope.launch {
-            saveImageToGallery(context, context.imageLoader, imageUrl)
+            shareImage(context, imageUrl)
         }
     }
 
@@ -273,9 +243,9 @@ fun PhotoViewerScreen(imageUrl: String, onBack: () -> Unit, modifier: Modifier =
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onSaveClick() }) {
+                    IconButton(onClick = { onShareClick() }) {
                         Icon(
-                            Icons.Default.Save,
+                            Icons.Default.Share,
                             contentDescription = null,
                             tint = Color.White,
                         )
