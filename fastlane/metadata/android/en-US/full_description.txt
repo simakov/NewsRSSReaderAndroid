@@ -1,6 +1,6 @@
 A news reader for the public RSS feeds of Lenta.ru, a Russian news site. This is an unofficial app: it is not affiliated with or endorsed by Lenta.ru.
 
-It only reads the news — no accounts, no comments, no recommendations.
+It only reads the news — no accounts, no comments, no recommendations. The interface and the news themselves are in Russian only; there is no English translation.
 
 <b>Features</b>
 
@@ -9,7 +9,7 @@ It only reads the news — no accounts, no comments, no recommendations.
 * Full article view: paragraphs, subheadings, photos, pull quotes, info boxes and author bylines
 * Read articles are dimmed in the list automatically
 * Bookmarks save an article's text and photos for offline reading
-* Photos open full screen, with pinch-zoom and save-to-gallery
+* Photos open full screen, with pinch-zoom, and can be sent on through the system share sheet
 * Pull past the end of an article to open the next one
 
 <b>Privacy</b>

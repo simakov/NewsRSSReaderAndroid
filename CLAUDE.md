@@ -11,7 +11,7 @@ app, but is a fully independent codebase with its own architecture, dependencies
 
 The app features tabbed news browsing (Главное / Последнее / Все), a category drawer menu, article
 detail viewing with rich content blocks (paragraphs, subheadings, images, quotes, info boxes,
-author bylines), and a full-screen photo viewer with pinch-zoom and save-to-gallery.
+author bylines), and a full-screen photo viewer with pinch-zoom and share-the-photo (no storage permission).
 
 ## Tech Stack
 
@@ -235,7 +235,7 @@ com.newsrssreader/
 │   ├── store/          on-disk state: ReadStateStore (+ReadStateCodec), BookmarkStore
 │   │                      (+BookmarkImageSource), ArticleContentJson/NewsItemJson serializers
 │   ├── NewsItemCache.kt  in-memory id -> NewsItem map bridging Navigation-Compose route args
-│   └── ImageSaver.kt     save-to-gallery helper (MediaStore / legacy file+permission)
+│   └── ImageSharer.kt    share-sheet helper: original bytes -> cacheDir/shared -> FileProvider -> ACTION_SEND
 ├── ui/
 │   ├── theme/            Color.kt, Type.kt, Theme.kt — design tokens (see below)
 │   ├── components/        NewsRow, NewsTop, NewsTabs, TopPanel, MenuView, Shimmer
@@ -364,6 +364,23 @@ screen the drawer shows no selection at all, since the icon that would carry it 
   (e.g. category extraction, quote text extraction, related-material extraction) deliberately
   diverging from iOS's now-stale selectors to stay accurate against the live site. See the doc
   comments in `LentaArticleParser.kt` for the exact fallback order per block type.
+- `ArticleReaderWebView` (`ui/article/`): the fallback for articles the parser can't turn into
+  blocks loads the real page with JavaScript on, so a live article page would run Lenta.ru's
+  Yandex Metrica/Webvisor, TNS, Rambler and Top.Mail.Ru counters. `ReaderWebViewClient` therefore
+  answers every request to a host outside `lenta.ru`/`*.lenta.ru` with an empty 403
+  (`isFirstPartyHost`), keeps first-party links inside the reader, and sends any other http(s) link to
+  the system browser (other schemes are dropped). This is what keeps the "no ads and no trackers"
+  line in the fastlane descriptions true; the cost is that third-party images in the page, such as
+  the team logos from `img.championat.com` in sports articles, don't load. The allowlist was checked
+  against a live article page: its own scripts come from `icdn.lenta.ru`, and every counter is on a
+  third-party host. What the allowlist deliberately lets through is Lenta.ru's own services:
+  `api.lenta.ru` (content lists) and `surge.lenta.ru` (article reactions, which is sent an anonymous
+  visitor id) - decided to leave them, since they are first party. Re-check all of this if
+  Lenta.ru's markup changes.
+- Sharing a photo (`ImageSharer.kt`) replaced save-to-gallery, which needed MediaStore and, on
+  API 26-28, `WRITE_EXTERNAL_STORAGE`. The original bytes (Coil's disk cache, else a download) go to
+  `cacheDir/shared/` and out through the existing `FileProvider` with `ACTION_SEND`; nothing is
+  re-encoded, and the app declares no storage permission at all.
 
 ### Design fidelity vs. deliberate deviations from iOS
 
@@ -375,7 +392,7 @@ with whoever's driving the work:
   Navigation.
 - Article parser selectors were updated to match *current* live Lenta.ru markup where it had
   drifted from the iOS app's (now stale) selectors.
-- The photo viewer (pinch-zoom, double-tap zoom, save-to-gallery) is an Android-only addition with
+- The photo viewer (pinch-zoom, double-tap zoom, share-the-photo) is an Android-only addition with
   no iOS equivalent in the source app.
 - News-list thumbnails **do** intentionally match iOS exactly: a fixed 60x60dp square with
   `ContentScale.Crop` (SwiftUI's `.aspectRatio(contentMode: .fill)` equivalent) — this was

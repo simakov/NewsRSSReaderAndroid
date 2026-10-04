@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/894ae91f-ad42-464b-9294-6dea5d1aeaf5
   инфобоксы, подписи авторов
 - Отметка прочитанного: заголовок уже открытой новости отличается в списке
 - Закладки: статья сохраняется вместе с текстом и фотографиями и читается без интернета
-- Полноэкранный просмотр фото с пинч-зумом и сохранением в галерею
+- Полноэкранный просмотр фото с пинч-зумом и отправкой через «Поделиться»
 - Пункт «О программе» внизу меню: показывает версию сборки и открывает репозиторий проекта
 
 ### Прочитанное и закладки
@@ -85,7 +85,7 @@ com.newsrssreader/
 │   ├── store/            состояние на диске: ReadStateStore (прочитанное), BookmarkStore
 │   │                       (закладки), сериализаторы ArticleContentJson/NewsItemJson
 │   ├── NewsItemCache.kt   in-memory кэш id -> NewsItem для аргументов навигации
-│   └── ImageSaver.kt      сохранение изображений в галерею (MediaStore / legacy-подход)
+│   └── ImageSharer.kt     отправка фото через системное «Поделиться» (FileProvider)
 ├── ui/
 │   ├── theme/             Color.kt, Type.kt, Theme.kt — дизайн-токены
 │   ├── components/         NewsRow, NewsTop, NewsTabs, TopPanel, MenuView, Shimmer
