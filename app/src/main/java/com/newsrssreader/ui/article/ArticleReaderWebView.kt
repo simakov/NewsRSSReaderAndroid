@@ -3,7 +3,6 @@ package com.newsrssreader.ui.article
 import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +32,9 @@ import com.newsrssreader.ui.theme.AppTheme
  * and the user still gets the readable-but-plain site rather than a blank screen. That is the one
  * case where the original markup survives, so the stylesheet is only injected when extraction
  * actually succeeded.
+ *
+ * Third-party requests are blocked and external links open in the browser - see
+ * [ReaderWebViewClient].
  *
  * The view is kept invisible until the script has run, so the reader view is the first thing the
  * user sees instead of a flash of the full site.
@@ -65,7 +67,7 @@ fun ArticleReaderWebView(url: String, modifier: Modifier = Modifier) {
                     settings.useWideViewPort = false
                     settings.builtInZoomControls = true
                     settings.displayZoomControls = false
-                    webViewClient = object : WebViewClient() {
+                    webViewClient = object : ReaderWebViewClient(context) {
                         override fun onPageFinished(view: WebView, url: String) {
                             // Re-runs after in-page navigation too (a link tapped inside the
                             // reader), so following a link stays in reader mode.
