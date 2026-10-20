@@ -106,6 +106,13 @@ reads the version literals out of `app/build.gradle.kts` at each new tag, writes
 itself, builds and publishes. **No merge request per release.** Running the `release` skill —
 which bumps the literals, writes the fastlane changelogs and pushes the tag — is the whole job.
 
+**F-Droid follows its own patch line, not the GitHub one.** GitHub releases bump MINOR (`v1.9.0`,
+`v1.10.0`); F-Droid gets `v1.8.x` tags cut from `v1.8.0` with the fixes cherry-picked (a branch
+that is never pushed, only the tag), and the recipe's `UpdateCheckMode: Tags ^v1\.8\.[0-9]+$`
+makes the bot ignore the rest. A `v1.8.x` tag gets no GitHub release, so the in-app updater never
+offers it. The `release` skill does not do this: bump with `bump_version.sh`, write the changelog
+for the new `versionCode`, tag, push the tag.
+
 What still needs a merge request is a change to the recipe itself: a new category, a renamed
 flavor, a changed license, a new anti-feature. Change
 [`com.newsrssreader.yml`](com.newsrssreader.yml) here in the same commit, so the two never drift.

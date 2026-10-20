@@ -41,13 +41,13 @@ RepoType: git
 Repo: https://github.com/simakov/NewsRSSReaderAndroid.git
 
 Builds:
-  - versionName: 1.8.0
-    versionCode: 10800
+  - versionName: 1.8.1
+    versionCode: 10801
     # The full hash, not the tag: their App-inclusion checklist requires it explicitly
     # ("The `commit` field should be the full hash. Please don't use tag or branch in commit").
-    # This is 236da40 = tag v1.8.0. AutoUpdateMode fills later entries itself, so this pinning
+    # This is 7eb589d = tag v1.8.1. AutoUpdateMode fills later entries itself, so this pinning
     # applies only to the first build.
-    commit: 236da40784a16033eee3001f4a92665c6057aff6
+    commit: 7eb589d47e66d0af53885c1fd5e4626d0ed571b5
     subdir: app
     # The fdroid flavor, not the github one: it has self-updating switched off and no
     # REQUEST_INSTALL_PACKAGES permission, because the F-Droid client does the updating for apps
@@ -60,7 +60,10 @@ Builds:
 # plain literals there and not computed from `git describe` — the bot regex-scans the file and
 # cannot run Gradle), adds the build entry itself, builds and publishes.
 AutoUpdateMode: Version
-UpdateCheckMode: Tags
+# F-Droid follows the 1.8.x patch line only. The GitHub releases (v1.9.0 and later) carry the same
+# fixes on a MINOR-bump line that F-Droid deliberately ignores; without the pattern, Tags mode
+# would pick v1.10.0 (versionCode 11000) as the newest tag. Widen it when F-Droid should move on.
+UpdateCheckMode: Tags ^v1\.8\.[0-9]+$
 
-CurrentVersion: 1.8.0
-CurrentVersionCode: 10800
+CurrentVersion: 1.8.1
+CurrentVersionCode: 10801
