@@ -1,0 +1,1 @@
+If the news fail to load, for example when you start the app offline, the screen now says "Нет соединения" (no connection). It also has a "Повторить" (retry) button and a link to your saved articles, which open without a network. Before, the screen stayed blank and there was no telling whether it was loading or broken.
