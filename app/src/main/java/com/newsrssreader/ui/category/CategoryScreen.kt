@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.data.store.ReadStateStore
+import com.newsrssreader.ui.components.FeedErrorState
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.TopPanel
@@ -46,6 +47,7 @@ fun CategoryScreen(
     viewModel: CategoryViewModel = viewModel { CategoryViewModel(categoryKey) },
     onMenuClick: () -> Unit,
     onArticleClick: (String) -> Unit,
+    onBookmarksClick: () -> Unit,
     showUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -63,6 +65,7 @@ fun CategoryScreen(
     val newItemIds = uiState.newItemIds
     val isLoading = uiState.isLoading
     val isRefreshing = uiState.isRefreshing
+    val isShowError = uiState.isShowError
 
     Column(
         modifier = modifier
@@ -94,6 +97,11 @@ fun CategoryScreen(
                 if (isLoading) {
                     items(7) {
                         NewsRowPlaceholder()
+                    }
+                } else if (isShowError && news.isEmpty()) {
+                    // See the matching branch in HomeScreen.
+                    item {
+                        FeedErrorState(onRetry = viewModel::refresh, onBookmarksClick = onBookmarksClick)
                     }
                 } else {
                     // Leading divider skipped for the first row — see the note in HomeScreen.

@@ -131,6 +131,8 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
     val bookmarksSelected = currentRoute == "bookmarks"
     val bookmarks by BookmarkStore.bookmarks.collectAsStateWithLifecycle()
 
+    val openBookmarks: () -> Unit = { navController.navigate("bookmarks") { popUpTo("home") } }
+
     BackHandler(enabled = menuShown) { menuShown = false }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -139,6 +141,7 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
                 HomeScreen(
                     onMenuClick = { menuShown = true },
                     onArticleClick = { id -> navController.navigate("article/$id") },
+                    onBookmarksClick = openBookmarks,
                     showUpdateBadge = showUpdateBadge,
                 )
             }
@@ -151,6 +154,7 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
                     categoryKey = key,
                     onMenuClick = { menuShown = true },
                     onArticleClick = { id -> navController.navigate("article/$id") },
+                    onBookmarksClick = openBookmarks,
                     showUpdateBadge = showUpdateBadge,
                 )
             }
@@ -215,7 +219,7 @@ fun AppRoot(updateViewModel: UpdateViewModel = viewModel()) {
                         // popUpTo("home") matches the category destinations: the drawer switches
                         // between top-level screens rather than stacking them, so back from here
                         // lands on Home instead of walking every screen the drawer visited.
-                        navController.navigate("bookmarks") { popUpTo("home") }
+                        openBookmarks()
                     }
                 },
                 onCategorySelected = { key ->
