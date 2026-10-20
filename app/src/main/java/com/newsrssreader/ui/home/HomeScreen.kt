@@ -29,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.newsrssreader.data.NewsFeedContext
 import com.newsrssreader.data.NewsItemCache
 import com.newsrssreader.data.store.ReadStateStore
+import com.newsrssreader.ui.components.FeedErrorState
 import com.newsrssreader.ui.components.NewsRow
 import com.newsrssreader.ui.components.NewsRowPlaceholder
 import com.newsrssreader.ui.components.NewsTabs
@@ -55,6 +56,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     onMenuClick: () -> Unit,
     onArticleClick: (String) -> Unit,
+    onBookmarksClick: () -> Unit,
     showUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -76,6 +78,7 @@ fun HomeScreen(
     val newItemIds = uiState.newItemIds
     val isLoading = uiState.isLoading
     val isRefreshing = uiState.isRefreshing
+    val isShowError = uiState.isShowError
 
     // Reset scroll to the top whenever the selected tab changes - but only on a real change.
     // This effect also runs on every (re)composition of the screen, including the one that
@@ -137,6 +140,12 @@ fun HomeScreen(
                 if (isLoading) {
                     items(7) {
                         NewsRowPlaceholder()
+                    }
+                } else if (isShowError && firstNews == null && feed.isEmpty()) {
+                    // Only when there is nothing to show: a failed refresh over a list that is
+                    // already there leaves that list alone (see HomeViewModel.loadFeeds).
+                    item {
+                        FeedErrorState(onRetry = viewModel::refresh, onBookmarksClick = onBookmarksClick)
                     }
                 } else {
                     // A leading divider skipped for the first row, rather than a trailing one
