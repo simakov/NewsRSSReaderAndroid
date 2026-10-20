@@ -78,7 +78,10 @@ fun HomeScreen(
     val newItemIds = uiState.newItemIds
     val isLoading = uiState.isLoading
     val isRefreshing = uiState.isRefreshing
-    val isShowError = uiState.isShowError
+    // A failed first load with nothing to show: the screen is the error block alone, tabs
+    // included, since they would only switch between feeds that fail the same way. A failed
+    // refresh over a list that is already there leaves that list alone (see HomeViewModel).
+    val showError = !isLoading && uiState.isShowError && firstNews == null && feed.isEmpty()
 
     // Reset scroll to the top whenever the selected tab changes - but only on a real change.
     // This effect also runs on every (re)composition of the screen, including the one that
@@ -133,17 +136,17 @@ fun HomeScreen(
                         isRead = firstNews?.id in readIds,
                     )
                 }
-                item {
-                    NewsTabs(selectedTab = tab, onTabSelected = viewModel::changeTab)
+                if (!showError) {
+                    item {
+                        NewsTabs(selectedTab = tab, onTabSelected = viewModel::changeTab)
+                    }
                 }
 
                 if (isLoading) {
                     items(7) {
                         NewsRowPlaceholder()
                     }
-                } else if (isShowError && firstNews == null && feed.isEmpty()) {
-                    // Only when there is nothing to show: a failed refresh over a list that is
-                    // already there leaves that list alone (see HomeViewModel.loadFeeds).
+                } else if (showError) {
                     item {
                         FeedErrorState(onRetry = viewModel::refresh, onBookmarksClick = onBookmarksClick)
                     }
