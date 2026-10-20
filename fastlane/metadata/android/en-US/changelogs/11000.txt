@@ -1,0 +1,1 @@
+If the news fail to load, the home screen now shows only the "Нет соединения" (no connection) message with a retry button and a link to your saved articles. The tabs are hidden while it is up: there was nothing to switch between, as no feed had loaded.
