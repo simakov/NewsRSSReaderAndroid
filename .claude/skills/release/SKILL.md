@@ -239,6 +239,12 @@ like breaking changes or small fixes.
    checkupdates`), because the reviewers ask for the MR to describe the current release. See
    `docs/fdroid/README.md`.
 
+   **This skill is the GitHub line only.** F-Droid follows a separate patch line (`v1.8.x`, see
+   `docs/fdroid/README.md`), so a release cut here is *not* what F-Droid builds: don't expect the
+   recipe to pick it up, and don't update the recipe to it. To get a fix to F-Droid, cut a patch
+   tag from the F-Droid base instead, then update the recipe in the fdroiddata clone
+   (`~/Downloads/fdroiddata`, branch `com.newsrssreader`).
+
    Share the release URL that `gh release create` prints, the final
    version number, and confirm the APK asset is attached (`gh release view <NEXT_VERSION>
    --json assets --jq '.assets[].name'`).

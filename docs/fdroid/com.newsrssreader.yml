@@ -63,7 +63,7 @@ AutoUpdateMode: Version
 # F-Droid follows the 1.8.x patch line only. The GitHub releases (v1.9.0 and later) carry the same
 # fixes on a MINOR-bump line that F-Droid deliberately ignores; without the pattern, Tags mode
 # would pick v1.10.0 (versionCode 11000) as the newest tag. Widen it when F-Droid should move on.
-UpdateCheckMode: Tags ^v1\.8\.[0-9]+$
+UpdateCheckMode: Tags ^v1\.8\.\d+$
 
 CurrentVersion: 1.8.1
 CurrentVersionCode: 10801

@@ -140,6 +140,14 @@ the tagged source, so it is editable without a merge request — but a per-relea
 ships if it was committed *before* the tag, which is why the `release` skill writes it as part of
 the version-bump commit.
 
+**F-Droid has its own version line.** GitHub releases bump MINOR (`v1.9.0`, `v1.10.0`, via the
+`release` skill); F-Droid gets **patch tags** (`v1.8.1`, ...) cut from `v1.8.0` with the wanted
+commits cherry-picked onto a branch that is never pushed, and the recipe's
+`UpdateCheckMode: Tags ^v1\.8\.\d+$` makes its bot ignore everything else. A patch tag gets no
+GitHub release, so the in-app updater never sees it. Procedure and the reasons are in
+`docs/fdroid/README.md`; the `release` skill does not do it. The fdroiddata clone with the open
+merge request is `~/Downloads/fdroiddata` (branch `com.newsrssreader`, remote on GitLab).
+
 Two constraints worth knowing before editing those files: `short_description.txt` is capped at 80
 characters and must not end with a period, and each changelog is capped at 500 characters. Both
 limits count **characters, not bytes**, so `wc -c` will tell you a Russian string is twice as
